@@ -1,0 +1,15 @@
+label,recall,support
+Botnet-TCP-Attempt-SPAM,0.9743589743589743,39
+Botnet-TCP-CC-Custom-Encryption,1,1
+Botnet-TCP-CC-HTTP-Custom-Encryption,1,1
+Botnet-TCP-CC-HTTP-Not-Encrypted,1,10
+Botnet-TCP-CC-Plain-HTTP-Encrypted-Data,0,2
+Botnet-TCP-Established-HTTP-Ad,0.5714285714285714,7
+Botnet-TCP-HTTP-Persistent-Down,0.6666666666666666,3
+Botnet-TCP-Not-Encrypted-SMTP-Private-Proxy,0.75,4
+Botnet-UDP-Attempt-DNS,0.3333333333333333,3
+Botnet-UDP-DNS,0,2
+Normal-CVUT-WebServer,0,1
+Normal-Grill,1,6
+Normal-Jist,0.9,10
+Normal-Stribrek,0.9761904761904762,42

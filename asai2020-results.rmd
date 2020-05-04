@@ -1,0 +1,188 @@
+---
+title: "ASAI 2020 Results"
+output: html_notebook
+---
+
+
+
+```{r eval=FALSE, include=FALSE}
+library(ggplot2)
+library(dplyr)
+resultperclass<-read_csv("results/results_per_subclass_test_kk.csv")
+
+dga_results_plot<-ggplot(resultperclass  %>% filter(grepl('Normal',label)) %>% mutate(label=gsub("Botnet\\.","",label))
+                         ,aes(x=label,y=recall))+
+  geom_point(aes(size=support,fill='skyblue'),color='black',shape = 21,alpha=0.5)+
+  geom_point(size=1,color='blue',fill='blue',shape = 21)+
+  ylab("True Positive Rate [TPR]")+
+  ggtitle("")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_gradient2(low = "cyan", mid='blue',high = "red")+
+   xlab(' Malware families' )+
+   guides(colour=FALSE,size=FALSE)+
+    scale_size_continuous(range = c(5,15))+
+  theme(legend.position="bottom")
+dga_results_plot
+
+```
+
+
+
+# Results for:
+## LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 5 symbols removed
+
+```{r}
+#setwd("results/")
+files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-*")
+
+str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_lstm <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm <-do.call(rbind,results_lstm)
+
+results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  ggtitle("LSTM Woodbridge + masking + 256 batch")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)))+
+  xlab("maxlen")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "free")
+```
+
+## RF + maxlen from 10 to 1000 + first 5 symbols removed
+```{r}
+#setwd("results/")
+files <- list.files(path = "results/",pattern="results_test_ctu13-rf-*")
+
+#str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_rf <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_rf <-do.call(rbind,results_rf)
+
+results_rf  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  ggtitle("RF")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)))+
+  xlab("maxlen")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "free")
+```
+
+### LSTM vs RF
+
+```{r fig.width=12}
+results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_column(model="rf"))
+results
+
+results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  ggtitle("RF vs LSTM")+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)))+
+  xlab("maxlen")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_grid(metric~maxlen, scales = "free")
+
+```
+# Results for:
+## RF trained with random sequences of maxlen=10 
+Dataset ctu13subs.csv: ctu13.csv filtering sequences >75 and extracting subsquences of lenght=10 with random start
+```{r}
+files <- list.files(path = "results/",pattern="results_test_ctu13-rf-sub*")
+
+
+results_rf <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_rf <-do.call(rbind,results_rf)
+results_rf
+```
+## LSTM trained with random sequences of maxlen=10 
+LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 5 symbols removed
+Dataset ctu13subs.csv: ctu13.csv ~625 sequences. Filtering sequences >75 and extracting subsquences of lenght=10 with random start
+
+```{r}
+files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-sub*")
+
+str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_lstm <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm <-do.call(rbind,results_lstm)
+results_lstm
+```
+# Results for:
+## LSTM vs RF random subsquence maxlen=10 using dataset with sequences >75
+
+
+```{r}
+results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_column(model="rf"))
+
+
+results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  ggtitle("RF vs LSTM")+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)))+
+  xlab("maxlen")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "free")
+```
+# Results for:
+## LSTM vs RF random subsquence maxlen=10,25,75 using full dataset 
+```{r}
+files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-subs-fulldataset-correct*")
+
+
+results_lstm <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+files <- list.files(path = "results/",pattern="results_test_ctu13-rf-subs-fulldataset-correct*")
+
+
+results_rf <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_rf <-do.call(rbind,results_rf)
+results_lstm <-do.call(rbind,results_lstm)
+
+results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_column(model="rf"))
+
+
+results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  ggtitle("RF vs LSTM")+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)))+
+  xlab("maxlen")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_grid(maxlen~metric)
+```
+
+```
+
