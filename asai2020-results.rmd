@@ -3,6 +3,13 @@ title: "ASAI 2020 Results"
 output: html_notebook
 ---
 
+```{r}
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+```
 
 
 ```{r eval=FALSE, include=FALSE}
@@ -184,5 +191,35 @@ results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitiv
   facet_grid(maxlen~metric)
 ```
 
+# CTU19
+
+# Results for:
+## LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 5 symbols removed
+
+```{r}
+
+#setwd("results/")
+files <- list.files(path = "results/",pattern="results_test_ctu19-lstm_endgame-*")
+
+str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_lstm <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm <-do.call(rbind,results_lstm)
+
+results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  labs(title="CTU19 [Train,Test] LSTM Woodbridge [10 executions]",
+        subtitle="Masking, 256 batch, first 5 symbols removed\nMaxlen from 10 to 1000 ")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)))+
+  xlab("maxlen")+
+  theme_bw()+
+  dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "free")
 ```
 

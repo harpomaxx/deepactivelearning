@@ -1,0 +1,11 @@
+---
+title: "CTU13bis removed characters and random"
+output: html_notebook
+---
+
+
+```{r}
+ctu13bis %>% select(modelsize,State,remove4,random)
+```
+
+

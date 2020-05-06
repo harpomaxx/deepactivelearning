@@ -1,0 +1,39 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(readr)
+library(dplyr)
+```
+
+```{r}
+ctu19<-read_csv("datasets/ctu19_result.csv")
+ctu19 %>% group_by(LabelName) %>% summarise(n=n())
+```
+```{r}
+ctu19<- ctu19 %>% select(State,LabelName) 
+names(ctu19)<-c("State","class")
+ctu19$State <- ctu19$State %>% substr(4,100000)
+ctu19 %>% nrow()
+ctu19 %>% group_by(class) %>% summarize(n=n())
+ctu19 %>% write_csv("datasets/ctu19subs.csv")
+names(ctu19)
+```
+
+```{r}
+ctu19<-ctu19 %>% mutate(modelsize=str_count(State,".")) 
+ctu19_cleaned<-ctu19 %>% filter (!is.na(Port))
+
+ctu19_cleaned %>% filter(Port < 1024) %>% group_by(modelsize,Port) %>% summarise(n=n()) %>% ungroup() %>% mutate(total=sum(n)) 
+
+ctu19_cleaned %>% filter(modelsize<4) %>% select(State)
+
+ctu19_cleaned$State <- ctu19_cleaned$State %>% substr(4,5000000)
+ggplot(ctu19_cleaned %>% filter(Port < 1024))+
+  geom_boxplot(aes(x=as.factor(X1),y=modelsize))+
+  theme_bw()
+  
+names(ctu19)
+```
+

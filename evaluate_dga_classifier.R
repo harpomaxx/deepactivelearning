@@ -40,7 +40,7 @@ models_dir='./models/'
 datasets_dir='./datasets/'
 #dataset_default='JISA2018.csv.gz'
 #dataset_default='argencon_vaclav.csv.gz'
-dataset_default='ctu13subs75.csv'
+dataset_default='ctu19subs.csv'
 #dataset_default='train_combined_multiclass.csv.gz'
 
 ### Function Definitions ####
@@ -79,7 +79,7 @@ evaluate_model_cv <- function(data,k=5, modelfun = keras_model_cnn_argencon,mode
     model_learned<-train_model(x=train_dataset_x,
                                y=train_dataset_y,
                                model=modelfun(train_dataset_x,parameters=model_parameters),
-                               modelname = paste(experimentname,"_model",sep="")
+                               modelname = paste(opt$experimenttag,"_model.h5",sep="")
                                )
     preds<-get_predictions(model_learned$model,test_dataset_x)
     
@@ -117,10 +117,12 @@ evaluate_model_train_test <- function(train_dataset_keras,test_dataset_keras,mod
   test_dataset_y<-ifelse(grepl("Normal",test_dataset_keras$label) ,0,1)
   model_learned<-train_model(x=train_dataset_x,
                              y=train_dataset_y,
-                             model=modelfun(train_dataset_x,parameters=model_parameters)
+                             model=modelfun(train_dataset_x,
+                             parameters=model_parameters),
+                             modelname=opt$experimenttag
                              
   )
-  model_learned$model %>% save_model_hdf5(paste(experimentname,"_model.h5",sep=""))
+  model_learned$model %>% save_model_hdf5(paste(opt$experimenttag,"_model.h5",sep=""))
   res<-evaluate_model_test(model_learned$model,test_dataset_x,test_dataset_y,test_dataset_keras$label)
   return (list(result=res$result, resultperclass=res$resultperclass,model_learned=model_learned))
 }
@@ -144,12 +146,10 @@ if (opt$testonly){
   model<-load_model_hdf5(opt$modelfile) #TODO check missing
   if (!is.null(opt$testfile)){
   	 print("[] Tokenizing testset")
-	 # testset<-read_csv(opt$testfile) #TODO check missing
-  	 #
-	 # testset$domain1<-str_split(testset$domain,"\\.",simplify = T)[,1]
-	 # test_dataset_keras<-build_dataset(as.matrix(testset),opt$maxlen)
-	 # test_dataset_x<-test_dataset_keras$encode
-	 # test_dataset_y<-ifelse(grepl("normal",test_dataset_keras$label) ,0,1)
+	   testset<-read_csv(opt$testfile) #TODO check missing
+     test_dataset_keras<-build_dataset(as.matrix(testset),opt$maxlen)
+	   test_dataset_x<-test_dataset_keras$encode
+	   test_dataset_y<-ifelse(grepl("normal",test_dataset_keras$label) ,0,1)
   }else{
  	 load(file='datasets/.test_dataset_keras.rd')
 	 test_dataset_x<-test_dataset_keras$encode

@@ -45,7 +45,7 @@ tokenize <- function(data,labels,maxlen){
   
   
   print("padding")
-  padded_token<-pad_sequences_fast(x_data,maxlen=maxlen,padding='post', truncating='post')
+  padded_token<-pad_sequences_fast(unname(x_data),maxlen=maxlen,padding='post', truncating='post')
 
   return (list(encode=padded_token,domain=data, label=labels))
   

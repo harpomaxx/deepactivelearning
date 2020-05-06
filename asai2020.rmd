@@ -1,0 +1,289 @@
+---
+title: "ASAI 2020 possible"
+output: html_notebook
+---
+## 1.A CREATE DATASET
+```{r}
+ctu13 <- read_csv("https://www.dropbox.com/s/np5ggx5ujwgll7k/ctu-13.labeled.cleaned?dl=1")
+
+#ctu13 <- read_csv("./data_all_result.txt")
+#ctu13 <- ctu13 %>% mutate(modelsize=nchar(State))
+#ctu13 <- ctu13 %>% filter (modelsize >5) 
+#ctu13<- ctu13 %>% select(State,subclass) 
+#ctu13 <-ctu13 %>% mutate(class=ifelse(class=="Normal","normal","botnet"))
+#ctu13<-ctu13 %>% filter (port != 25) 
+#ctu13$State <- ctu13$State %>% substr(5,100000)
+
+ 
+ctu13<- ctu13 %>% select(State,label) 
+names(ctu13)<-c("State","class")
+ctu13$State <- ctu13$State %>% substr(4,100000)
+ctu13 %>% nrow()
+ctu13 %>% group_by(class) %>% summarize(n=n())
+ctu13 %>% write_csv("datasets/ctu13subs.csv")
+ctu_maxlen=100
+```
+# 1.B CREATE DATASET USING RANDOM START SEQ
+```{r}
+ctu13bis <- read_csv("https://www.dropbox.com/s/np5ggx5ujwgll7k/ctu-13.labeled.cleaned?dl=1")
+
+#ctu13bis <- ctu13bis %>% filter (modelsize >75)
+# remove first 5 symbols
+ctu13bis$State <- ctu13bis$State %>% substr(4,100000)
+#ctu13bis <- ctu13bis %>% filter (modelsize >5) 
+
+rand_substr<-function(str,len=75){
+  if(nchar(str)>len){
+    start<-sample(1:(nchar(str)-len),1)
+    stop<-start+len
+  
+    #return(start)
+    return(str_sub(str,start,stop))
+  }else{
+    return(str)
+  }
+}
+subState<-lapply(as.list(ctu13bis$State),rand_substr)
+ctu13bis$State <- do.call(rbind,subState)                    
+ctu13bis<- ctu13bis %>% select(State,label) 
+names(ctu13bis)<-c("State","class")
+ctu13bis %>% write_csv("datasets/ctu13subs75.csv")
+
+#ctu13bis %>% group_by(modelsize) %>% summarise(total=n())
+ctu13bis %>% select(State) 
+```
+
+# CREATE TRAIN AND TEST
+```{r} 
+source("preprocess.R")
+datasets<-build_train_test(datasetfile = "datasets/ctu13subs.csv",maxlen = ctu_maxlen)
+# WARNING: to avoid regenerating de train and test sets, just uncomments the following lines
+# WARNING: there is no guarantee the files saved correspond to argencon.csv. If unsure, just re-run build_train_test()
+load(file='datasets/.train_dataset_keras.rd')
+load(file='datasets/.test_dataset_keras.rd')
+datasets<-list()
+datasets$train<-train_dataset_keras
+datasets$test<-test_dataset_keras
+
+as.data.frame(datasets$train) %>% mutate(la=ifelse(grepl("Normal",datasets$train$label) ,"Normal","Botnet")) %>% group_by(la) %>% summarise(n=n())
+
+as.data.frame(datasets$test) %>% mutate(la=ifelse(grepl("Normal",datasets$test$label) ,"Normal","Botnet")) %>% group_by(la) %>% summarise(n=n())
+```
+## NEURAL NETWORK
+
+```{r}
+cnn_argecon_parameters_cnn=list(
+  nb_filter = 256,
+  kernel_size = 4,
+  embedingdim = 100,
+  hidden_size = 512 
+)
+
+
+lstm_endgame_parameters=list(
+  embedingdim = 128,
+  lstm_size = 128,
+  dropout = 0.5,
+  hidden_size= 512
+)
+
+
+library(caret)
+source("create_csv.R")
+source("preprocess.R")
+source("build_model.R")
+source("tune.R")
+# WARNING it is necesarry to load all the functionf from evaluate_dga.R file. Not refactored for source() yet.
+
+
+result_train_test<-evaluate_model_train_test(train_dataset_keras = datasets$train,
+                                             test_dataset_keras = datasets$test,
+                                             modelfun = keras_model_lstm_endgame,
+                                             experimentname = "asai-2020",
+                                             model_parameters= lstm_endgame_parameters)
+asai_2020_model<-result_train_test$model_learned$model
+#cacic_2018_model<-load_model_hdf5("models/cacic-2018_model.h5")
+summary(asai_2020_model)
+```
+
+## Results
+```{r}
+#datasets$test$encode
+preds<-get_predictions(model = asai_2020_model,test_dataset_x =  datasets$test$encode,threshold = 0.75 )
+```
+
+```{r}
+test_results<-data.frame(predicted_class=preds,class=ifelse(grepl("Normal",datasets$test$label) ,0,1) ,domain=datasets$test$domain,label=datasets$test$label) 
+#test_results
+caret::confusionMatrix(as.factor(test_results$predicted_class),as.factor(test_results$class), positive='1', mode="everything" )
+```
+
+```{r}
+
+test_results$label
+test_results %>% mutate(modelsize=nchar(as.character(label))) %>% filter(class==0 & preds ==1) %>% select(label,modelsize) %>% group_by(modelsize,label) %>% summarise(n=n())
+```
+
+```{r eval=FALSE, include=FALSE}
+data.frame(modelsize =datasets$test$domain  %>% nchar(),label = ifelse(datasets$test$label=="botnet",1,0), prediction=preds) %>% filter (prediction==1 & label==0) %>%
+  ggplot()+
+  geom_histogram(aes(x=modelsize))+
+  theme_bw()
+
+```
+#RANDOM FOREST
+```{r}
+
+
+ctu13_train_vectorized <- as.data.frame(as.character(train_dataset_keras$domain),stringsAsFactors=FALSE)
+names(ctu13_train_vectorized)<-c("State")
+ctu13_train_vectorized <-as.tibble(ctu13_train_vectorized)
+ctu13_train_vectorized<- ctu13_train_vectorized %>% mutate(modelsize=str_count(State,"."))
+
+ctu13_train_vectorized$State <- ctu13_train_vectorized$State %>% substr(1,ctu_maxlen)
+ctu13_train_vectorized<-ctu13_train_vectorized %>% mutate(modelsize=nchar(State))
+#Periodicity
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(strong_p = str_count(State,'[a-i]'))
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(weak_p = str_count(State,'[A-I]'))
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(weak_np = str_count(State,'[r-z]'))
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(strong_np = str_count(State,'[R-Z]'))
+#Duration
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(duration_s = str_count(State,'(a|A|r|R|1|d|D|u|U|4|g|G|x|X|7)'))
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(duration_m = str_count(State,'(b|B|s|S|2|e|E|v|V|5|h|H|y|Y|8)'))
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(duration_l = str_count(State,'(c|C|t|T|3|f|F|w|W|6|i|I|z|Z|9)'))
+#Size
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(size_s = str_count(State,'[a-c]') + str_count(State,'[A-C]') + str_count(State,'[r-t]') + str_count(State,'[R-T]') + str_count(State,'[1-3]'))
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(size_m = str_count(State,'[d-f]') + str_count(State,'[D-F]') + str_count(State,'[u-w]') + str_count(State,'[U-W]') + str_count(State,'[4-6]'))
+ctu13_train_vectorized = ctu13_train_vectorized %>% mutate(size_l = str_count(State,'[g-i]') + str_count(State,'[G-I]') + str_count(State,'[x-z]') + str_count(State,'[X-Z]') + str_count(State,'[7-9]'))
+
+#Periodicity %
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(strong_p = (strong_p / modelsize))
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(weak_p = (weak_p / modelsize))
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(strong_np = (strong_np / modelsize))
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(weak_np = (weak_np / modelsize))
+#Duration %
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(duration_s = (duration_s / modelsize))
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(duration_m = (duration_m / modelsize))
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(duration_l = (duration_l / modelsize))
+#Size %
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(size_s = (size_s / modelsize))
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(size_m = (size_m / modelsize))
+ctu13_train_vectorized <- ctu13_train_vectorized %>% mutate(size_l = (size_l / modelsize))
+
+#Making feature vectors
+ctu13_train_vectorized <- ctu13_train_vectorized %>% select('strong_p','weak_p','weak_np','strong_np','duration_s','duration_m','duration_l','size_s','size_m','size_l','modelsize')
+
+names(ctu13_train_vectorized) <- c("sp","wp","wnp","snp","ds","dm","dl","ss","sm","sl","modelsize")
+ctu13_train_vectorized$label <- train_dataset_keras$label
+
+ctu13_train_vectorized<-ctu13_train_vectorized %>% mutate(class=ifelse(grepl(pattern = "Normal", x = label),0,1))
+ctu13_train_vectorized$class<-as.factor(ctu13_train_vectorized$class)
+ctu13_train_vectorized %>% group_by(class) %>% summarize(tot=n())
+```
+```{r}
+
+ctu13_test_vectorized <- as.data.frame(as.character(test_dataset_keras$domain),stringsAsFactors=FALSE)
+names(ctu13_test_vectorized)<-c("State")
+ctu13_test_vectorized <-as.tibble(ctu13_test_vectorized)
+ctu13_test_vectorized<- ctu13_test_vectorized %>% mutate(modelsize=str_count(State,"."))
+ctu13_test_vectorized$State <- ctu13_test_vectorized$State %>% substr(1,ctu_maxlen)
+ctu13_test_vectorized<- ctu13_test_vectorized %>% mutate(modelsize=nchar(State))
+
+#Periodicity
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(strong_p = str_count(State,'[a-i]'))
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(weak_p = str_count(State,'[A-I]'))
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(weak_np = str_count(State,'[r-z]'))
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(strong_np = str_count(State,'[R-Z]'))
+#Duration
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(duration_s = str_count(State,'(a|A|r|R|1|d|D|u|U|4|g|G|x|X|7)'))
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(duration_m = str_count(State,'(b|B|s|S|2|e|E|v|V|5|h|H|y|Y|8)'))
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(duration_l = str_count(State,'(c|C|t|T|3|f|F|w|W|6|i|I|z|Z|9)'))
+#Size
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(size_s = str_count(State,'[a-c]') + str_count(State,'[A-C]') + str_count(State,'[r-t]') + str_count(State,'[R-T]') + str_count(State,'[1-3]'))
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(size_m = str_count(State,'[d-f]') + str_count(State,'[D-F]') + str_count(State,'[u-w]') + str_count(State,'[U-W]') + str_count(State,'[4-6]'))
+ctu13_test_vectorized = ctu13_test_vectorized %>% mutate(size_l = str_count(State,'[g-i]') + str_count(State,'[G-I]') + str_count(State,'[x-z]') + str_count(State,'[X-Z]') + str_count(State,'[7-9]'))
+
+#Periodicity %
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(strong_p = (strong_p / modelsize))
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(weak_p = (weak_p / modelsize))
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(strong_np = (strong_np / modelsize))
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(weak_np = (weak_np / modelsize))
+#Duration %
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(duration_s = (duration_s / modelsize))
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(duration_m = (duration_m / modelsize))
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(duration_l = (duration_l / modelsize))
+#Size %
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(size_s = (size_s / modelsize))
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(size_m = (size_m / modelsize))
+ctu13_test_vectorized <- ctu13_test_vectorized %>% mutate(size_l = (size_l / modelsize))
+
+#Making feature vectors
+ctu13_test_vectorized <- ctu13_test_vectorized %>% select('strong_p','weak_p','weak_np','strong_np','duration_s','duration_m','duration_l','size_s','size_m','size_l','modelsize')
+
+names(ctu13_test_vectorized) <- c("sp","wp","wnp","snp","ds","dm","dl","ss","sm","sl","modelsize")
+ctu13_test_vectorized$label <- test_dataset_keras$label
+ctu13_test_vectorized<-ctu13_test_vectorized %>% mutate(class=ifelse(grepl(pattern = "Normal", x = label),0,1))
+ctu13_test_vectorized$class<-as.factor(ctu13_test_vectorized$class)
+ctu13_test_vectorized %>% group_by(class) %>% summarize(tot=n())
+```
+```{r}
+
+#rfModel<-randomForest:tuneRF(x=ctu13_train_vectorized %>% select(-modelsize,-label),y=ctu13_train_vectorized$label,doBest = T)
+
+```
+
+## Results
+```{r}
+ctu13_train_vectorized<-dataset_train_vectorized
+ctu13_test_vectorized<-dataset_test_vectorized
+
+library(randomForest)
+rfModel<-randomForest(x= ctu13_train_vectorized %>% select(-modelsize,-label,-class),y=ctu13_train_vectorized$class,mtry = 2)
+
+
+rfpreds<-predict(rfModel,ctu13_test_vectorized %>% select(-modelsize,-label,-class), type="prob")
+confusionMatrix(as.factor(ctu13_test_vectorized$class),as.factor(ifelse(rfpreds[,1]>0.5,0,1)),positive = "1", mode="everything" )
+```
+
+```{r}
+ctu13_test_vectorized %>% add_column(preds=as.factor(ifelse(rfpreds[,1]>0.5,0,1))) %>% filter(class==0 & preds ==1) %>% select(modelsize,label) %>% group_by(label) %>% summarise(n=n())
+```
+
+
+
+
+
+```{r eval=FALSE, include=FALSE}
+
+
+
+library(caret)
+require(doMC)
+registerDoMC(cores=4)
+ctrl_fast <- trainControl(method="cv", 
+                     repeats=2,
+                     number=10, 
+                     summaryFunction=twoClassSummary,
+                     verboseIter=T,
+                     classProbs=TRUE,
+                     allowParallel = TRUE) 
+ctrl_fast$sampling<-"up"
+rfFit <- train(label ~ sp+wp+wnp+snp+ds+dm+dl+ss+sm+sl,
+               data = ctu13_train_vectorized,
+               metric="ROC",
+               method = "rf",
+               trControl = ctrl_fast)
+rfFit
+```
+
+```{r eval=FALSE, include=FALSE}
+rfpreds<-predict(rfFit,ctu13_test_vectorized, type="prob")
+confusionMatrix(as.factor(ctu13_test_vectorized$label),as.factor(ifelse(rfpreds[,1]>0.5,"botnet","normal")),positive = "botnet", mode="everything" )
+
+
+```
+
+```{r}
+dataset_test_vectorized
+```
+
