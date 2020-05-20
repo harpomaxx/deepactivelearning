@@ -7,6 +7,7 @@ source("model_lstm_endgame.R")
 source("model_lstm_custom.R")
 source("model_mc_cnn_asai.R")
 source("model_dense.R")
+source("model_lstm_endgame_norm.R")
 
 # list for selecting between different models
 #funcs<-list( cnn_argencon=keras_model_cnn_argencon,
