@@ -17,7 +17,10 @@ option_list <- list(
   make_option("--testonly", action="store_true", help = "Bypass training and test with previous weights",default=FALSE),
   make_option("--maxlen", action="store", type="numeric", default=45, help = "Set the maximun length of the domain name considered"),
   make_option("--modelfile", action="store", type="character", help = "A file to load model from"),
-  make_option("--testfile", action="store", type="character", help = "A file to load test data from")
+  make_option("--testfile", action="store", type="character", help = "A file to load test data from"),
+  make_option("--datafile", action="store", type="character", help = "A file to load dataset from", default = "ctu19subs.csv"),
+  make_option("--upsample", action="store_true", help = "Apply oversampling to  train dataset",default=FALSE)
+  
 )
 opt <- parse_args(OptionParser(option_list=option_list))
 
@@ -40,7 +43,9 @@ models_dir='./models/'
 datasets_dir='./datasets/'
 #dataset_default='JISA2018.csv.gz'
 #dataset_default='argencon_vaclav.csv.gz'
-dataset_default='ctu19subs.csv'
+dataset_default=opt$datafile
+#dataset_default='ctu13subs.csv'
+
 #dataset_default='train_combined_multiclass.csv.gz'
 
 ### Function Definitions ####
@@ -149,11 +154,11 @@ if (opt$testonly){
 	   testset<-read_csv(opt$testfile) #TODO check missing
      test_dataset_keras<-build_dataset(as.matrix(testset),opt$maxlen)
 	   test_dataset_x<-test_dataset_keras$encode
-	   test_dataset_y<-ifelse(grepl("normal",test_dataset_keras$label) ,0,1)
+	   test_dataset_y<-ifelse(grepl("Normal",test_dataset_keras$label) ,0,1)
   }else{
  	 load(file='datasets/.test_dataset_keras.rd')
 	 test_dataset_x<-test_dataset_keras$encode
-	 test_dataset_y<-ifelse(grepl("normal",test_dataset_keras$label) ,0,1)
+	 test_dataset_y<-ifelse(grepl("Normal",test_dataset_keras$label) ,0,1)
   }
   results<-evaluate_model_test(model,test_dataset_x,test_dataset_y,test_dataset_keras$label)
   print("[] Saving results ")
@@ -171,7 +176,7 @@ if (!file.exists("datasets/.train_dataset_keras.rd")){
 #### Generate new datasets from csv or load previously generated R objects #######
 if ( opt$generate){
   print("[] Generating Datasets")
-  datasets<-build_train_test(paste(datasets_dir,dataset_default,sep=""),opt$maxlen)
+  datasets<-build_train_test(paste(datasets_dir,dataset_default,sep=""),opt$maxlen,upsample=opt$upsample)
   train_dataset_keras<-datasets$train
   test_dataset_keras<-datasets$test
 } else {

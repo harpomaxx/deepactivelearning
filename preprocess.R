@@ -74,16 +74,16 @@ train_test_sample<-function(x,percent=0.7){
   return (train_ind)
 }
 
-build_train_test<-function(datasetfile,maxlen){
+build_train_test<-function(datasetfile,maxlen, upsample = FALSE){
   dataset<-read_delim(datasetfile,delim = ",")
   #dataset$domain1<-str_split(dataset$domain,"\\.",simplify = T)[,1]
   dindex<-train_test_sample(dataset,0.7)
   train_dataset<-dataset[dindex,]
   test_dataset<-dataset[-dindex,]
-  
-  #train_dataset<-train_dataset %>% mutate(label=ifelse(grepl("Normal",train_dataset$class) ,"Normal","Botnet"))
-  #train_dataset<- caret::upSample(x=train_dataset[,1], y=as.factor(train_dataset$label),list = F,yname = "class")
-  
+  if (upsample){
+    train_dataset<-train_dataset %>% mutate(label=ifelse(grepl("Normal",train_dataset$class) ,"Normal","Botnet"))
+    train_dataset<- caret::upSample(x=train_dataset[,1], y=as.factor(train_dataset$label),list = F,yname = "class")
+  }
   # Dataset transformation usually requires a lot of time. Some sort of caching needed
   train_dataset_keras<-build_dataset(as.matrix(train_dataset),maxlen)
   save(train_dataset_keras,file = "datasets/.train_dataset_keras.rd")
