@@ -1,0 +1,131 @@
+---
+title: "CTU-13 vs. CTU-19"
+output: html_notebook
+---
+
+
+```{r}
+ctu13_sample <- readr::read_csv("./dga-wb-r/datasets/ctu13subs.csv") %>% sample_n(1000)
+ctu19_sample <- readr::read_csv("./dga-wb-r/datasets/ctu19subs.csv") %>% sample_n(1000)
+```
+
+```{r}
+
+
+  ctu13_tokenized=tokenize(as.matrix(ctu13_sample$State),ctu13_sample$class,maxlen = 100)
+  ctu19_tokenized=tokenize(as.matrix(ctu19_sample$State),ctu19_sample$class,maxlen = 100)
+ 
+```
+```{r}
+ctu13_tokenized$dataset<-rep("ctu13",length(ctu13_tokenized$domain))
+ctu19_tokenized$dataset<-rep("ctu19",,length(ctu19_tokenized$domain))
+
+ctu13_tokenized$label<-ctu13_tokenized$label %>%  map(function(x) str_split(x,"-")[[1]][1] %>% unlist()) %>% unlist()
+  
+
+  
+  
+ctu13vsctu19<-list()
+ctu13vsctu19$encode<-abind(ctu13_tokenized$encode,
+                           ctu19_tokenized$encode,
+                            along=1)
+
+
+ctu13vsctu19$domain<-c(ctu13_tokenized$domain,
+                      ctu19_tokenized$domain)
+  
+
+ctu13vsctu19$dataset<-c(ctu13_tokenized$dataset,
+                      ctu19_tokenized$dataset)
+
+
+ctu13vsctu19$label<-c(ctu13_tokenized$label,
+                      ctu19_tokenized$label)
+
+```
+
+```{r}
+pca<-prcomp(ctu13vsctu19$encode[,1:20],center=TRUE,scale.=TRUE)
+  pca_data<-data.frame(pca$x,
+                       dataset=ctu13vsctu19$dataset,
+                       label=ctu13vsctu19$label,
+                       domain=ctu13vsctu19$domain)
+  
+ # pca_plot<-ggplot(pca_data ,aes(x=PC1,y=PC4))+
+ #   geom_point(aes(color=res,text=domain,shape=as.factor(label)),alpha=0.5)+
+ #   theme_bw()
+  
+
+plotly::plot_ly(pca_data , type="scatter3d", 
+                x = ~PC1, y = ~PC2, z = ~PC3, color = ~dataset, symbol = ~label,
+                colors = c('blue', 'orange',"red","green"), 
+                opacity=0.5, marker = list(size = 3),text = ~domain) 
+```
+```{r}
+library(umap)
+custom.config = umap.defaults
+custom.config$n_components = 3
+umap_res <- umap(ctu13vsctu19$encode[,1:50], custom.config  )
+
+umap_data<-data.frame(umap_res$layout,
+                       dataset=ctu13vsctu19$dataset,
+                       label=ctu13vsctu19$label,
+                       domain=ctu13vsctu19$domain)
+
+umap_plot<-ggplot(umap_data ,aes(x=X1,y=X2))+
+  geom_point(aes(color=dataset,text=domain,shape=as.factor(label)),alpha=0.1)+
+  theme_bw()
+  
+
+a <- list(
+   showgrid = TRUE,
+   showticklabels = TRUE,
+   showline=TRUE,
+   tickangle = 45,
+   gridwidth = 4
+   )
+
+plotly::plot_ly(umap_data , type="scatter3d", 
+                x = ~X1, y = ~X2, z = ~X3, color = ~dataset, symbol = ~label,
+                colors = c('blue', 'orange'), 
+                opacity=0.2, marker = list(size = 3),text = ~domain) %>% 
+                layout(plot_bgcolor='rgb(0,0,0,0)') %>%
+                layout(paper_bgcolor='rgb(0, 0, 0)') %>% 
+                layout(scene = list(xaxis = a, yaxis = a, zaxis = a)) %>%
+                layout(title="CTU13 vs CTU19 UMAP 3D representation")
+  
+  
+
+
+
+```
+
+### LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 4 symbols removed
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+#setwd("results/")
+files <- list.files(path = "results/",pattern="results_test_ctu19-lstm_endgame-\\d+")
+
+str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_lstm <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm <-do.call(rbind,results_lstm)
+
+results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  labs(title="CTU19 [Train,Test] LSTM Woodbridge [10 executions]",
+        subtitle="Masking, 256 batch, first 4 symbols removed\nMaxlen from 10 to 1000 ")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='black')+
+  xlab("maxlen")+
+  theme_bw()+
+  dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "free")
+```
+

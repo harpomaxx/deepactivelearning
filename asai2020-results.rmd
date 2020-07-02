@@ -1,14 +1,21 @@
 ---
 title: "ASAI 2020 Results"
-output: html_notebook
+output: 
+  html_notebook: 
+    code_folding: none
+    fig_height: 6
+    fig_width: 14
+    toc: yes
 ---
 
-```{r}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 library(stringr)
 library(dplyr)
 library(tidyr)
 library(tibble)
 library(ggplot2)
+library(readr)
+library(ggdark)
 ```
 
 
@@ -36,14 +43,14 @@ dga_results_plot
 
 
 
-# Results for:
-## LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 5 symbols removed
+# Results for CTU13:
+### LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 4 symbols removed
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 #setwd("results/")
-files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-*")
+files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-\\d+")
 
-str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+#str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
 results_lstm <- lapply(files, function(x) 
                 read_csv(paste("results/",x,sep=""))   
@@ -54,17 +61,20 @@ results_lstm <-do.call(rbind,results_lstm)
 
 results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
-  ggtitle("LSTM Woodbridge + masking + 256 batch")+
-  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)))+
+   labs(title="CTU13 [Train,Test] LSTM Woodbridge [10 executions]",
+        subtitle="Masking, 256 batch, first 4 symbols removed\nMaxlen from 10 to 1000 ")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='black')+
   xlab("maxlen")+
   theme_bw()+
+  dark_theme_gray()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme(legend.position="none")+
   facet_wrap(~metric, scales = "free")
 ```
 
-## RF + maxlen from 10 to 1000 + first 5 symbols removed
-```{r}
+### RF + maxlen from 10 to 1000 + first 4 symbols removed
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 #setwd("results/")
 files <- list.files(path = "results/",pattern="results_test_ctu13-rf-*")
 
@@ -80,9 +90,10 @@ results_rf <-do.call(rbind,results_rf)
 results_rf  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
   ggtitle("RF")+
-  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)))+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='black')+
   xlab("maxlen")+
   theme_bw()+
+  dark_theme_gray()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme(legend.position="none")+
   facet_wrap(~metric, scales = "free")
@@ -90,25 +101,27 @@ results_rf  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F
 
 ### LSTM vs RF
 
-```{r fig.width=12}
+```{r echo=FALSE, fig.width=12, message=FALSE, warning=FALSE, paged.print=TRUE}
 results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_column(model="rf"))
-results
+#results
 
 results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
   ggtitle("RF vs LSTM")+
-  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)))+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='black')+
   xlab("maxlen")+
   theme_bw()+
+  dark_theme_gray()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme(legend.position="none")+
   facet_grid(metric~maxlen, scales = "free")
 
 ```
-# Results for:
-## RF trained with random sequences of maxlen=10 
+
+### RF trained with random sequences of maxlen=10 
+
 Dataset ctu13subs.csv: ctu13.csv filtering sequences >75 and extracting subsquences of lenght=10 with random start
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 files <- list.files(path = "results/",pattern="results_test_ctu13-rf-sub*")
 
 
@@ -118,16 +131,18 @@ results_rf <- lapply(files, function(x)
                 )
 
 results_rf <-do.call(rbind,results_rf)
-results_rf
+#results_rf
 ```
-## LSTM trained with random sequences of maxlen=10 
-LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 5 symbols removed
+
+### LSTM trained with random sequences of maxlen=10 
+
+LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 4 symbols removed
 Dataset ctu13subs.csv: ctu13.csv ~625 sequences. Filtering sequences >75 and extracting subsquences of lenght=10 with random start
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-sub*")
 
-str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+#str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
 results_lstm <- lapply(files, function(x) 
                 read_csv(paste("results/",x,sep=""))   
@@ -135,29 +150,30 @@ results_lstm <- lapply(files, function(x)
                 )
 
 results_lstm <-do.call(rbind,results_lstm)
-results_lstm
+#results_lstm
 ```
-# Results for:
-## LSTM vs RF random subsquence maxlen=10 using dataset with sequences >75
 
+### LSTM vs RF random subsquence maxlen=10 using dataset with sequences >75
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_column(model="rf"))
 
 
 results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
   ggtitle("RF vs LSTM")+
-  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)))+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='black')+
   xlab("maxlen")+
   theme_bw()+
+  dark_theme_gray()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme(legend.position="none")+
   facet_wrap(~metric, scales = "free")
 ```
-# Results for:
-## LSTM vs RF random subsquence maxlen=10,25,75 using full dataset 
-```{r}
+
+### LSTM vs RF random subsquence maxlen=10,25,75 using full dataset 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-subs-fulldataset-correct*")
 
 
@@ -183,23 +199,25 @@ results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_colu
 results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
   ggtitle("RF vs LSTM")+
-  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)))+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='black')+
   xlab("maxlen")+
   theme_bw()+
+  dark_theme_gray()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme(legend.position="none")+
   facet_grid(maxlen~metric)
 ```
 
-# CTU19
+------
 
-# Results for:
-## LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 5 symbols removed
+# Results for CTU19:
 
-```{r}
+### LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 4 symbols removed
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 #setwd("results/")
-files <- list.files(path = "results/",pattern="results_test_ctu19-lstm_endgame-*")
+files <- list.files(path = "results/",pattern="results_test_ctu19-lstm_endgame-\\d+")
 
 str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
@@ -213,8 +231,8 @@ results_lstm <-do.call(rbind,results_lstm)
 results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
   labs(title="CTU19 [Train,Test] LSTM Woodbridge [10 executions]",
-        subtitle="Masking, 256 batch, first 5 symbols removed\nMaxlen from 10 to 1000 ")+
-  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)))+
+        subtitle="Masking, 256 batch, first 4 symbols removed\nMaxlen from 10 to 1000 ")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='black')+
   xlab("maxlen")+
   theme_bw()+
   dark_theme_gray()+
@@ -223,3 +241,49 @@ results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy",
   facet_wrap(~metric, scales = "free")
 ```
 
+### RF + maxlen from 10 to 1000 + first 4 symbols removed
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#setwd("results/")
+files <- list.files(path = "results/",pattern="results_test_ctu19-rf-\\d+")
+
+#str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_rf <- lapply(files, function(x) 
+                read_csv(paste("results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_rf <-do.call(rbind,results_rf)
+
+results_rf  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+   labs(title="CTU19 [Train,Test] RF [10 executions]",
+        subtitle="First 4 symbols removed\nMaxlen from 10 to 1000 ")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='black')+
+  xlab("maxlen")+
+  dark_theme_gray()+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "free")
+```
+
+### LSTM vs RF
+
+```{r echo=FALSE, fig.width=12, message=FALSE, warning=FALSE, paged.print=TRUE}
+results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_column(model="rf"))
+#results
+
+results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  labs(title="CTU19 [Train,Test] RF vs LSTM [10 executions]",
+        subtitle="First 4 symbols removed\nMaxlen from 10 to 1000 ")+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='black')+
+  xlab("maxlen")+
+  theme_bw()+
+  dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_grid(metric~maxlen, scales = "free")
+
+```

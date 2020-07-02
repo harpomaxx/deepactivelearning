@@ -1,20 +1,29 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "CTU19"
+output: 
+  html_notebook: 
+    code_folding: hide
 ---
 ```{r}
 library(readr)
 library(dplyr)
+library(stringr)
+library(purrr)
+library(ggplot2)
+library(skimr)
 ```
 
 ```{r}
 ctu19<-read_csv("datasets/ctu19_result.csv")
 ctu19 %>% group_by(LabelName) %>% summarise(n=n())
 ```
+# Create dataset
 ```{r}
 ctu19<- ctu19 %>% select(State,LabelName) 
 names(ctu19)<-c("State","class")
 ctu19$State <- ctu19$State %>% substr(4,100000)
+ctu19<-ctu19 %>% filter(State!="")
+
 ctu19 %>% nrow()
 ctu19 %>% group_by(class) %>% summarize(n=n())
 ctu19 %>% write_csv("datasets/ctu19subs.csv")
@@ -22,6 +31,8 @@ names(ctu19)
 ```
 
 ```{r}
+ctu19<-readr::read_csv("datasets/ctu19subs.csv")
+
 ctu19<-ctu19 %>% mutate(modelsize=str_count(State,".")) 
 ctu19_cleaned<-ctu19 %>% filter (!is.na(Port))
 
@@ -35,5 +46,182 @@ ggplot(ctu19_cleaned %>% filter(Port < 1024))+
   theme_bw()
   
 names(ctu19)
+```
+```{r}
+ctu19<-readr::read_csv("datasets/ctu19subs.csv")
+ctu19<-ctu19 %>% mutate(modelsize=str_count(State,".")) 
+ctu19 %>% filter(modelsize >100) %>% group_by(class) %>% summarise(n=n())
+
+ctu19 %>% nrow()
+summary(ctu19)
+skim(ctu19 %>% mutate(class=as.factor(class)))
+
+ctu19 %>% select(State) %>% unique() %>% nrow
+```
+
+```{r fig.height=4, fig.width=10}
+create_histogram<-function(x){
+  valid_characters <- "$abcdefghiABCDEFGHIrstuvwxyzRSTUVWXYZ0123456789" %>% str_split("")
+  valid_characters <- valid_characters[[1]] 
+  valid_characters[48]="\\."
+  valid_characters[49]="\\,"
+  valid_characters[50]="\\+"
+  valid_characters[51]="\\*"
+
+  freq<- (x %>% map(function(x) str_count(x,valid_characters)) %>% unlist() %>% matrix( ncol = 51, byrow = TRUE) %>% colSums())
+  freq<-freq/ sum( str_count(x,".") )
+  plot<-data.frame(freq=freq,symbols=valid_characters) %>%
+  ggplot()+
+  geom_col(aes(x=symbols,y=freq),fill='black',col='black')+
+  theme_bw()
+  plot
+}
+n <- (ctu19 %>% filter(class == "Normal" & modelsize <100))$State 
+
+nh<-create_histogram(n)
+nh <- nh +  labs(title="CTU19 seq char distribution for Normal [modelsize <100]")
+
+m <- (ctu19 %>% filter(class != "Normal" & modelsize <100))$State 
+
+mh<-create_histogram(m)
+mh <- mh +  labs(title="CTU19 seq char distribution for Malware [modelsize <100]")
+
+gridExtra::grid.arrange(nh,mh)
+
+```
+```{r}
+#source("preprocess.R")
+#datasets<-build_train_test(datasetfile = "datasets/ctu13subs.csv",maxlen = ctu_maxlen)
+# WARNING: to avoid regenerating de train and test sets, just uncomments the following lines
+# WARNING: there is no guarantee the files saved correspond to argencon.csv. If unsure, just re-run build_train_test()
+load(file='datasets/.train_dataset_keras.rd')
+load(file='datasets/.test_dataset_keras.rd')
+datasets<-list()
+datasets$train<-train_dataset_keras
+datasets$test<-test_dataset_keras
+
+### Function Definitions ####
+get_predictions <- function(model, test_dataset_x,threshold=0.5) {
+  predsprobs<-model %>% predict(test_dataset_x, batch_size=256)
+  preds<-ifelse(predsprobs>threshold,1,0)
+  return (preds)
+}
+```
+
+```{r}
+model<-keras::load_model_hdf5("models/ctu19-lstm_endgame-400-10_model.h5")
+summary(model)
+preds<-get_predictions(model = model,test_dataset_x =  datasets$test$encode,threshold = 0.5 )
+```
+
+```{r}
+test_results<-data.frame(predicted_class=preds,class=ifelse(grepl("Normal",datasets$test$label) ,0,1) ,domain=datasets$test$domain,label=datasets$test$label) 
+#test_results
+caret::confusionMatrix(as.factor(test_results$predicted_class),as.factor(test_results$class), positive='1', mode="everything" )
+```
+```{r fig.height=8, fig.width=10}
+fp<-(test_results %>% mutate(modelsize=str_count(domain,"."))  %>%  filter(class == 0 & predicted_class == 1))
+fn<-(test_results %>% mutate(modelsize=str_count(domain,"."))  %>%  filter(class == 1 & predicted_class == 0))
+tp<-(test_results %>% mutate(modelsize=str_count(domain,"."))  %>%  filter(class == 1 & predicted_class == 1))
+tn<-(test_results %>% mutate(modelsize=str_count(domain,"."))  %>%  filter(class == 0 & predicted_class == 0))
+
+
+fp_domain<-fp$domain
+tp_domain<-tp$domain
+fn_domain<-fn$domain
+tn_domain<-tn$domain
+
+
+fp_h<-create_histogram(fp_domain)
+fp_h <- fp_h +  labs(title="CTU19 seq char distribution for False Positive")
+#fp_h <- fp_h + ylim(0,500)
+
+tp_h<-create_histogram(tp_domain)
+tp_h <- tp_h +  labs(title="CTU19 seq char distribution for True Positive")
+#tp_h <- tp_h + ylim(0,500)
+
+fn_h<-create_histogram(fn_domain)
+fn_h <- fn_h +  labs(title="CTU19 seq char distribution for False Negative")
+tn_h<-create_histogram(tn_domain)
+tn_h <- tn_h +  labs(title="CTU19 seq char distribution for True Negative")
+
+gridExtra::grid.arrange(fp_h,tp_h,fn_h,tn_h,ncol=1)
+#library(scales)
+#tp_h + scale_y_continuous(limits=c(0,1000),oob = rescale_none)
+#fp_h + scale_y_continuous(limits=c(0,1000),oob = rescale_none)
+```
+
+```{r}
+fp$type<-"fp"
+tp$type<-"tp"
+tn$type<-"tn"
+fn$type<-"fn"
+
+plot<-rbind(fp,tp,tn,fn) %>%
+  ggplot()+
+  geom_boxplot(aes(x=type,y=modelsize),fill='orange') +
+  ylim(0,500)+
+  theme_bw()
+plot
+ggplotly(plot)
+```
+
+##  pca 2D proyection
+```{r}
+source("preprocess.R")
+library(abind)
+  tp <- tp %>% sample_n(1000)
+  fp_tokenized=tokenize(as.matrix(fp$domain),fp$label,maxlen = 100)
+  tp_tokenized=tokenize(as.matrix(tp$domain),tp$label,maxlen = 100)
+  fn_tokenized=tokenize(as.matrix(fn$domain),fn$label,maxlen = 100)
+  tn_tokenized=tokenize(as.matrix(tn$domain),tn$label,maxlen = 100)
+  
+  
+  
+  fp_tokenized$res<-rep("FP", length(fp_tokenized$domain))
+  tp_tokenized$res<-rep("TP", length(tp_tokenized$domain))
+  
+  fn_tokenized$res<-rep("FN", length(fn_tokenized$domain))
+  tn_tokenized$res<-rep("TN", length(tn_tokenized$domain))
+  
+  
+  malware_results=list()
+  malware_results$encode<-abind(fp_tokenized$encode,
+                                tp_tokenized$encode,
+                                fn_tokenized$encode,
+                                tn_tokenized$encode,
+                              along=1)
+  malware_results$domain<-c(fp_tokenized$domain,
+                            tp_tokenized$domain,
+                            fn_tokenized$domain,
+                            tn_tokenized$domain)
+                      
+  malware_results$res<-c(fp_tokenized$res,
+                         tp_tokenized$res,
+                         fn_tokenized$res,
+                         tn_tokenized$res
+                         )
+  malware_results$label<-c(as.character(fp_tokenized$label),
+                           as.character(tp_tokenized$label),
+                           as.character(fn_tokenized$label),
+                           as.character(tn_tokenized$label)
+                           
+                           )
+  
+  #nrow(malware_results$encode)
+  #length(malware_results$label)
+  #length(malware_results$domain)
+  
+  pca=prcomp(malware_results$encode[,1:20],center=TRUE,scale.=TRUE)
+  pca_data<-data.frame(pca$x,res=malware_results$res,label=malware_results$label,domain=malware_results$domain)
+ # pca_plot<-ggplot(pca_data ,aes(x=PC1,y=PC4))+
+ #   geom_point(aes(color=res,text=domain,shape=as.factor(label)),alpha=0.5)+
+ #   theme_bw()
+  
+
+plotly::plot_ly(pca_data , type="scatter3d", 
+                x = ~PC1, y = ~PC2, z = ~PC3, color = ~res, symbol = ~label,
+                colors = c('blue', 'orange',"red","green"), 
+                opacity=0.5, marker = list(size = 3),text = ~domain) 
 ```
 
