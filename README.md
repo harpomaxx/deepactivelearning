@@ -1,4 +1,4 @@
-Deep Learning Framework for Analysis of Text Sequences
+Deep Learning Framework for Analysis of Text Sequences in Network Security
 ======================================================
 
 A set of R scripts for using keras and tf for detecting patterns in text sequences and perform a binary classifcation. The `evaluate_dga_classifier.R` script is the main part of the framework. It is possible to invoke the scripts with several parameters to perform tuning, oversampling, and test a model on a different file.
