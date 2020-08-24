@@ -21,7 +21,7 @@ ctu19 %>% group_by(LabelName) %>% summarise(n=n())
 ```{r}
 ctu19<- ctu19 %>% select(State,LabelName) 
 names(ctu19)<-c("State","class")
-ctu19$State <- ctu19$State %>% substr(4,100000)
+ctu19$State <- ctu19$State %>% substr(4,nchar(ctu19$State))
 ctu19<-ctu19 %>% filter(State!="")
 
 ctu19 %>% nrow()

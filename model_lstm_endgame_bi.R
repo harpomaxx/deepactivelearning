@@ -29,9 +29,9 @@ keras_model_lstm_endgame_bidirectional<-function(x,parameters=default_keras_mode
   embeding<- inputs %>% layer_embedding(length(valid_characters_vector), parameters$embedingdim , input_length = input_shape,mask_zero=T)
   
   lstm <- embeding %>%
-    bidirectional(layer_lstm(units = parameters$lstm_size)) %>%
+    bidirectional(layer_lstm(units = parameters$lstm_size,recurrent_dropout = parameters$dropout)) %>%
   
-    layer_dropout(rate = parameters$dropout) %>%
+    #layer_dropout(rate = parameters$dropout) %>%
     layer_dense(1, activation = 'sigmoid')
   
   #compile model

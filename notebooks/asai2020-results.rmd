@@ -22,7 +22,7 @@ library(ggdark)
 ```{r eval=FALSE, include=FALSE}
 library(ggplot2)
 library(dplyr)
-resultperclass<-read_csv("results/results_per_subclass_test_kk.csv")
+resultperclass<-read_csv("../results/results_per_subclass_test_kk.csv")
 
 dga_results_plot<-ggplot(resultperclass  %>% filter(grepl('Normal',label)) %>% mutate(label=gsub("Botnet\\.","",label))
                          ,aes(x=label,y=recall))+
@@ -48,12 +48,12 @@ dga_results_plot
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 #setwd("results/")
-files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-\\d+")
+files <- list.files(path = "../results/",pattern="results_test_ctu13-lstm_endgame-\\d+")
 
 #str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
 results_lstm <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
@@ -76,12 +76,12 @@ results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy",
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 #setwd("results/")
-files <- list.files(path = "results/",pattern="results_test_ctu13-rf-*")
+files <- list.files(path = "../results/",pattern="results_test_ctu13-rf-*")
 
 #str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
 results_rf <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
@@ -122,11 +122,11 @@ results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitiv
 
 Dataset ctu13subs.csv: ctu13.csv filtering sequences >75 and extracting subsquences of lenght=10 with random start
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-files <- list.files(path = "results/",pattern="results_test_ctu13-rf-sub*")
+files <- list.files(path = "../results/",pattern="results_test_ctu13-rf-sub*")
 
 
 results_rf <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
@@ -140,12 +140,12 @@ LSTM Woodbridge + 256 batchs + Masking after 10 executions + maxlen from 10 to 1
 Dataset ctu13subs.csv: ctu13.csv ~625 sequences. Filtering sequences >75 and extracting subsquences of lenght=10 with random start
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-sub*")
+files <- list.files(path = "../results/",pattern="results_test_ctu13-lstm_endgame-sub*")
 
 #str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
 results_lstm <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
@@ -174,19 +174,19 @@ results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitiv
 ### LSTM vs RF random subsquence maxlen=10,25,75 using full dataset 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-files <- list.files(path = "results/",pattern="results_test_ctu13-lstm_endgame-subs-fulldataset-correct*")
+files <- list.files(path = "../results/",pattern="results_test_ctu13-lstm_endgame-subs-fulldataset-correct*")
 
 
 results_lstm <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
-files <- list.files(path = "results/",pattern="results_test_ctu13-rf-subs-fulldataset-correct*")
+files <- list.files(path = "../results/",pattern="results_test_ctu13-rf-subs-fulldataset-correct*")
 
 
 results_rf <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
@@ -199,7 +199,7 @@ results<-rbind(results_lstm %>% add_column(model="lstm"),results_rf %>% add_colu
 results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
   ggtitle("RF vs LSTM")+
-  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='black')+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='darkgray')+
   xlab("maxlen")+
   theme_bw()+
   dark_theme_gray()+
@@ -217,12 +217,12 @@ results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitiv
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 #setwd("results/")
-files <- list.files(path = "results/",pattern="results_test_ctu19-lstm_endgame-\\d+")
+files <- list.files(path = "../results/",pattern="results_test_ctu19-lstm_endgame-\\d+")
 
-str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+str_replace(string = "../results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
 results_lstm <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
@@ -232,7 +232,7 @@ results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy",
   ggplot() +
   labs(title="CTU19 [Train,Test] LSTM Woodbridge [10 executions]",
         subtitle="Masking, 256 batch, first 4 symbols removed\nMaxlen from 10 to 1000 ")+
-  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='black')+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='darkgray')+
   xlab("maxlen")+
   theme_bw()+
   dark_theme_gray()+
@@ -244,12 +244,12 @@ results_lstm  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy",
 ### RF + maxlen from 10 to 1000 + first 4 symbols removed
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 #setwd("results/")
-files <- list.files(path = "results/",pattern="results_test_ctu19-rf-\\d+")
+files <- list.files(path = "../results/",pattern="results_test_ctu19-rf-\\d+")
 
 #str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
 
 results_rf <- lapply(files, function(x) 
-                read_csv(paste("results/",x,sep=""))   
+                read_csv(paste("../results/",x,sep=""))   
                 %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
                 )
 
@@ -259,10 +259,10 @@ results_rf  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F
   ggplot() +
    labs(title="CTU19 [Train,Test] RF [10 executions]",
         subtitle="First 4 symbols removed\nMaxlen from 10 to 1000 ")+
-  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='black')+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='darkgray')+
   xlab("maxlen")+
   dark_theme_gray()+
-  theme_bw()+
+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme(legend.position="none")+
   facet_wrap(~metric, scales = "free")
@@ -278,7 +278,7 @@ results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitiv
   ggplot() +
   labs(title="CTU19 [Train,Test] RF vs LSTM [10 executions]",
         subtitle="First 4 symbols removed\nMaxlen from 10 to 1000 ")+
-  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='black')+
+  geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='darkgray')+
   xlab("maxlen")+
   theme_bw()+
   dark_theme_gray()+
