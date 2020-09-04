@@ -255,18 +255,23 @@ results_rf <- lapply(files, function(x)
 
 results_rf <-do.call(rbind,results_rf)
 
-results_rf  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+results_rf  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>% #group_by(maxlen,metric) %>% summarise(mean=mean(value),sd=sd(value)) %>%
   ggplot() +
    labs(title="CTU19 [Train,Test] RF [10 executions]",
         subtitle="First 4 symbols removed\nMaxlen from 10 to 1000 ")+
-  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='darkgray')+
-  xlab("maxlen")+
+  #geom_col(aes(x=as.factor(maxlen),y=mean,fill=as.factor(maxlen)),color='darkgray')+
+   geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='darkgray')+
+
+   xlab("maxlen")+
   dark_theme_gray()+
 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   theme(legend.position="none")+
-  facet_wrap(~metric, scales = "free")
+  facet_wrap(~metric, scales = 'free')
 ```
+
+
+
 
 ### LSTM vs RF
 

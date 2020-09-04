@@ -14,7 +14,7 @@ library(skimr)
 ```
 
 ```{r}
-ctu19<-read_csv("datasets/ctu19_result.csv")
+ctu19<-read_csv("../datasets/ctu19_result.csv")
 ctu19 %>% group_by(LabelName) %>% summarise(n=n())
 ```
 # Create dataset
@@ -26,7 +26,7 @@ ctu19<-ctu19 %>% filter(State!="")
 
 ctu19 %>% nrow()
 ctu19 %>% group_by(class) %>% summarize(n=n())
-ctu19 %>% write_csv("datasets/ctu19subs.csv")
+ctu19 %>% write_csv("../datasets/ctu19subs2.csv")
 names(ctu19)
 ```
 
