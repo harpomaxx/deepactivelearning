@@ -1,5 +1,5 @@
 ---
-title: "CTU19"
+title: "CTU19 analysis"
 output: 
   html_notebook: 
     code_folding: hide
@@ -11,54 +11,67 @@ library(stringr)
 library(purrr)
 library(ggplot2)
 library(skimr)
+getwd()
 ```
 
 ```{r}
-ctu19<-read_csv("../datasets/ctu19_result.csv")
+ctu19<-read_csv("../datasets/ctu19_filtered.csv")
 ctu19 %>% group_by(LabelName) %>% summarise(n=n())
+ctu19[1,]$State %>% nchar()
 ```
-# Create dataset
+
+# Create dataset for deepseq
+## Remove first 4 symbols
+```{r}
+ctu19$State <- ctu19$State %>% substr(5,nchar(ctu19$State))
+ctu19<-ctu19 %>% filter(State!="")
+ctu19 %>% write_csv("../datasets/ctu19_filtered_first4removed.csv")
+ctu19 %>% group_by(LabelName) %>% summarise(n=n())
+ctu19[1,]$State %>% nchar()
+```
+
+
+## Select features and rename
 ```{r}
 ctu19<- ctu19 %>% select(State,LabelName) 
 names(ctu19)<-c("State","class")
-ctu19$State <- ctu19$State %>% substr(4,nchar(ctu19$State))
-ctu19<-ctu19 %>% filter(State!="")
+ctu19 <- ctu19 %>% rename(label="class") %>% mutate(class=ifelse(label=="Botnet",1,0)) %>% select(State,class,label)
 
-ctu19 %>% nrow()
-ctu19 %>% group_by(class) %>% summarize(n=n())
-ctu19 %>% write_csv("../datasets/ctu19subs2.csv")
+head(ctu19)
+ctu19 %>% write_csv("../datasets/ctu19_filtered_first4removed_deepseq.csv")
 names(ctu19)
 ```
-
+# Create modelsize feature 
 ```{r}
-ctu19<-readr::read_csv("datasets/ctu19subs.csv")
+ctu19<-readr::read_csv("../datasets/ctu19_filtered_first4removed.csv")
 
 ctu19<-ctu19 %>% mutate(modelsize=str_count(State,".")) 
-ctu19_cleaned<-ctu19 %>% filter (!is.na(Port))
+ctu19_cleaned<-ctu19 %>% filter (!is.na(port))
 
-ctu19_cleaned %>% filter(Port < 1024) %>% group_by(modelsize,Port) %>% summarise(n=n()) %>% ungroup() %>% mutate(total=sum(n)) 
+ctu19_cleaned %>% filter(port < 1024) %>% group_by(modelsize,port) %>% summarise(n=n()) %>% ungroup() %>% mutate(total=sum(n)) 
 
 ctu19_cleaned %>% filter(modelsize<4) %>% select(State)
 
 ctu19_cleaned$State <- ctu19_cleaned$State %>% substr(4,5000000)
-ggplot(ctu19_cleaned %>% filter(Port < 1024))+
-  geom_boxplot(aes(x=as.factor(X1),y=modelsize))+
+ggplot(ctu19_cleaned %>% filter(port < 1024))+
+  geom_boxplot(aes(x=as.factor(port),y=modelsize))+
   theme_bw()
   
 names(ctu19)
 ```
+# Class distribution for sequences with modelsize >100
 ```{r}
-ctu19<-readr::read_csv("datasets/ctu19subs.csv")
+ctu19<-readr::read_csv("../datasets/ctu19_filtered_first4removed.csv")
 ctu19<-ctu19 %>% mutate(modelsize=str_count(State,".")) 
 ctu19 %>% filter(modelsize >100) %>% group_by(class) %>% summarise(n=n())
 
 ctu19 %>% nrow()
 summary(ctu19)
-skim(ctu19 %>% mutate(class=as.factor(class)))
+skimr::skim(ctu19 %>% mutate(class=as.factor(class)))
 
 ctu19 %>% select(State) %>% unique() %>% nrow
 ```
-
+# Symbol histogram for sequences with modelsize <100
 ```{r fig.height=4, fig.width=10}
 create_histogram<-function(x){
   valid_characters <- "$abcdefghiABCDEFGHIrstuvwxyzRSTUVWXYZ0123456789" %>% str_split("")
@@ -89,9 +102,98 @@ mh <- mh +  labs(title="CTU19 seq char distribution for Malware [modelsize <100]
 gridExtra::grid.arrange(nh,mh)
 
 ```
+#PCA visualization
+## 2D Visualization
 ```{r}
-#source("preprocess.R")
-#datasets<-build_train_test(datasetfile = "datasets/ctu13subs.csv",maxlen = ctu_maxlen)
+source("../../deepseq/config.R") # required for using deepseq
+source("../../deepseq/preprocess.R") # required for padding function
+ 
+ctu19_first4removed<-read_csv("../datasets/ctu19_filtered_first4removed.csv")
+
+tokenize <- function(data){
+  sequencel<-sapply(data,function(x)  strsplit(x,split=""))
+  x_data <- lapply(sequencel,function(x) sapply(x,function(x) tokens[[x]]))
+  }
+
+tokenized_seq <- tokenize(ctu19_first4removed$State)
+padded_seq<-pad_sequences_fast(unname(tokenized_seq),maxlen=100,padding='post', truncating='post')
+
+  pca<-prcomp(padded_seq,center=TRUE,scale.=TRUE)
+  summary(pca)
+  pca_data<-data.frame(pca$x,label=ctu19_first4removed$LabelName,source=ctu19_first4removed$source)
+  pca_plot<-ggplot(pca_data,aes(x=PC1,y=PC2))+
+    geom_point(aes(color=label),alpha=0.5,size=0.1)+
+    ggdark::dark_theme_bw()
+pca_plot
+
+```
+
+```{r}
+pca_plot + facet_wrap(~source)
+pca_plot
+gridExtra::grid.arrange(pca_plot,pca_plot + theme(legend.position = "none")  + facet_wrap(~source),ncol=2)
+```
+## 3D Visualization
+```{r}
+library(plotly)
+a <- list(
+   showgrid = TRUE,
+   showticklabels = TRUE,
+   showline=TRUE,
+   tickangle = 45,
+   gridwidth = 4
+   )
+
+plotly::plot_ly(pca_data , type="scatter3d", 
+                x = ~PC1, y = ~PC3, z = ~PC2, color = ~label,
+                colors = c('orange', 'blue',"red","skyblue"), 
+                opacity=0.1, marker = list(size = 1)) %>%
+                layout(plot_bgcolor='rgb(0,0,0,0)') %>%
+                layout(paper_bgcolor='rgb(0, 0, 0)') %>% 
+                layout(scene = list(xaxis = a, yaxis = a, zaxis = a)) %>%
+                layout(title="CTU19 PCA 3D representation")
+
+
+
+
+```
+# UMAP visualization
+```{r}
+library(umap)
+custom.config = umap.defaults
+custom.config$n_components = 2
+umap_res <- umap(padded_seq, custom.config  )
+
+
+
+  umap_data<-data.frame(umap_res$layout,
+                        label=ctu19_first4removed$LabelName,
+                        source=ctu19_first4removed$source)
+  umap_plot<-ggplot(umap_data,aes(x=X1,y=X2))+
+    geom_point(aes(color=label),alpha=0.1,size=0.1)+
+    ggdark::dark_theme_bw()
+umap_plot
+
+#umap_data<-data.frame(umap_res$layout,
+#                       dataset=ctu13vsctu19$dataset,
+#                       label=ctu13vsctu19$label,
+#                       domain=ctu13vsctu19$domain)
+```
+
+
+
+
+
+
+
+# Keras model analysis results
+
+```{r}
+source("../../deepseq/config.R")
+source("../../deepseq/preprocess.R")
+
+#dataset_df <- read_valid_csv("../datasets/ctu19_filtered_first4removed.csv")
+#datasets <- build_train_test(dataset = datasets ,maxlen = 100)
 # WARNING: to avoid regenerating de train and test sets, just uncomments the following lines
 # WARNING: there is no guarantee the files saved correspond to argencon.csv. If unsure, just re-run build_train_test()
 load(file='datasets/.train_dataset_keras.rd')
@@ -109,7 +211,7 @@ get_predictions <- function(model, test_dataset_x,threshold=0.5) {
 ```
 
 ```{r}
-model<-keras::load_model_hdf5("models/ctu19-lstm_endgame-400-10_model.h5")
+model<-keras::load_model_hdf5("../models/ctu19-lstm_endgame-400-10_model.h5")
 summary(model)
 preds<-get_predictions(model = model,test_dataset_x =  datasets$test$encode,threshold = 0.5 )
 ```
@@ -166,9 +268,9 @@ plot
 ggplotly(plot)
 ```
 
-##  pca 2D proyection
+## PCA 2D proyection
 ```{r}
-source("preprocess.R")
+source("../../deepseq/preprocess.R")
 library(abind)
   tp <- tp %>% sample_n(1000)
   fp_tokenized=tokenize(as.matrix(fp$domain),fp$label,maxlen = 100)
@@ -223,5 +325,66 @@ plotly::plot_ly(pca_data , type="scatter3d",
                 x = ~PC1, y = ~PC2, z = ~PC3, color = ~res, symbol = ~label,
                 colors = c('blue', 'orange',"red","green"), 
                 opacity=0.5, marker = list(size = 3),text = ~domain) 
+```
+```{r}
+ctu19<-read_csv("../datasets/ctu19subs2.csv")
+```
+```{r}
+vectorize_seq <-function(dataset,maxlen){
+#dataset_vectorized <- as.data.frame(as.character(dataset),stringsAsFactors=FALSE)
+#names(dataset_vectorized)<-c("State")
+dataset_vectorized <-as_tibble(dataset)
+dataset_vectorized<- dataset_vectorized %>% mutate(modelsize=str_count(State,"."))
+if (maxlen > 0){
+  dataset_vectorized$State <- dataset_vectorized$State %>% substr(1,maxlen)
+  dataset_vectorized<-dataset_vectorized %>% mutate(modelsize=nchar(State))
+}
+#Periodicity
+dataset_vectorized = dataset_vectorized %>% mutate(strong_p = str_count(State,'[a-i]'))
+dataset_vectorized = dataset_vectorized %>% mutate(weak_p = str_count(State,'[A-I]'))
+dataset_vectorized = dataset_vectorized %>% mutate(weak_np = str_count(State,'[r-z]'))
+dataset_vectorized = dataset_vectorized %>% mutate(strong_np = str_count(State,'[R-Z]'))
+#Duration
+dataset_vectorized = dataset_vectorized %>% mutate(duration_s = str_count(State,'(a|A|r|R|1|d|D|u|U|4|g|G|x|X|7)'))
+dataset_vectorized = dataset_vectorized %>% mutate(duration_m = str_count(State,'(b|B|s|S|2|e|E|v|V|5|h|H|y|Y|8)'))
+dataset_vectorized = dataset_vectorized %>% mutate(duration_l = str_count(State,'(c|C|t|T|3|f|F|w|W|6|i|I|z|Z|9)'))
+#Size
+dataset_vectorized = dataset_vectorized %>% mutate(size_s = str_count(State,'[a-c]') + str_count(State,'[A-C]') + str_count(State,'[r-t]') + str_count(State,'[R-T]') + str_count(State,'[1-3]'))
+dataset_vectorized = dataset_vectorized %>% mutate(size_m = str_count(State,'[d-f]') + str_count(State,'[D-F]') + str_count(State,'[u-w]') + str_count(State,'[U-W]') + str_count(State,'[4-6]'))
+dataset_vectorized = dataset_vectorized %>% mutate(size_l = str_count(State,'[g-i]') + str_count(State,'[G-I]') + str_count(State,'[x-z]') + str_count(State,'[X-Z]') + str_count(State,'[7-9]'))
+
+#Periodicity %
+dataset_vectorized <- dataset_vectorized %>% mutate(strong_p = (strong_p / modelsize))
+dataset_vectorized <- dataset_vectorized %>% mutate(weak_p = (weak_p / modelsize))
+dataset_vectorized <- dataset_vectorized %>% mutate(strong_np = (strong_np / modelsize))
+dataset_vectorized <- dataset_vectorized %>% mutate(weak_np = (weak_np / modelsize))
+#Duration %
+dataset_vectorized <- dataset_vectorized %>% mutate(duration_s = (duration_s / modelsize))
+dataset_vectorized <- dataset_vectorized %>% mutate(duration_m = (duration_m / modelsize))
+dataset_vectorized <- dataset_vectorized %>% mutate(duration_l = (duration_l / modelsize))
+#Size %
+dataset_vectorized <- dataset_vectorized %>% mutate(size_s = (size_s / modelsize))
+dataset_vectorized <- dataset_vectorized %>% mutate(size_m = (size_m / modelsize))
+dataset_vectorized <- dataset_vectorized %>% mutate(size_l = (size_l / modelsize))
+
+#Making feature vectors
+dataset_vectorized <- dataset_vectorized %>% select('strong_p','weak_p','weak_np','strong_np','duration_s',
+                                                    'duration_m','duration_l','size_s','size_m','size_l','modelsize','class','label')
+
+names(dataset_vectorized) <- c("sp","wp","wnp","snp","ds","dm","dl","ss","sm","sl","modelsize",'class','label')
+
+
+#dataset_vectorized<-dataset_vectorized %>% mutate(class=ifelse(grepl(pattern = "Normal", x = label),0,1))
+#dataset_vectorized$class<-as.factor(dataset_vectorized$class)
+#
+dataset_vectorized %>% group_by(class) %>% summarize(tot=n())
+dataset_vectorized
+}
+```
+```{r}
+ctu19_vectorized <- vectorize_seq(ctu19,0)
+```
+```{r}
+library(FactoMineR)
 ```
 

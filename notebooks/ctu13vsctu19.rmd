@@ -198,15 +198,52 @@ results_lstm_recurrent_drop  %>% arrange(maxlen) %>% filter(metric %in%  c("Bala
 
 
 
+### LSTM Woodbridge Bidirectional recurrent_dropout + 256 batchs + Masking after 10 executions + maxlen from 10 to 1000 + first 4 symbols removed
+
+```{r echo=FALSE, fig.height=8, fig.width=12, message=FALSE, warning=FALSE}
+
+#setwd("results/")
+library("tibble")
+library("ggdark")
+files <- list.files(path = "../results/",pattern="results_test_ctu19-lstm_endgame_bi_recurrent_drop-upsample-cswitch_ctu13-\\d+")
+
+
+results_lstm_bi_recurrent_drop <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*-([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_bi_recurrent_drop <-do.call(rbind,results_lstm_bi_recurrent_drop)
+
+results_lstm_bi_recurrent_drop  %>% arrange(maxlen) %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
+  ggplot() +
+  labs(title="CTU19 [Train], CTU13 [Test] LSTM Woodbridge Bi Recurrent Drop [10 executions]",
+        subtitle="Masking, 256 batch, first 4 symbols removed\nMaxlen from 10 to 1000 ")+
+  geom_boxplot(aes(x=as.factor(maxlen),y=value,fill=as.factor(maxlen)),color='darkgray')+
+ # geom_point(aes(x=as.factor(maxlen),y=value,color=as.factor(maxlen)),color='black')+
+  
+  xlab("maxlen")+
+  theme_bw()+
+  dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "free")
+```
+
+
+
+
 ```{r}
 
 results<-rbind(results_lstm %>% add_column(model="lstm"),
                results_lstm_norm %>% add_column(model="lstm_bi"), 
-               results_lstm_recurrent_drop %>% add_column(model="lstm_rdrop"))
+               results_lstm_recurrent_drop %>% add_column(model="lstm_rdrop"),
+               results_lstm_bi_recurrent_drop %>% add_column(model="lstm_bi_rdrop") 
+               )
 
 results %>% filter(metric %in%  c("Balanced Accuracy","F1","Precision","Sensitivity","Specificity")) %>%
   ggplot() +
-  labs(title="CTU19 [Train] CTU13 [Test] LSTM variants [10 executions]",
+  labs(title="CTU19 [Train] CTU13 [Test] LSTM variants with upsampling [10 executions]",
         subtitle="First 4 symbols removed\nMaxlen from 10 to 1000 ")+
   geom_boxplot(aes(x=as.factor(model),y=value,fill=as.factor(model)),color='darkgray')+
   xlab("maxlen")+

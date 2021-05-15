@@ -1,0 +1,367 @@
+---
+title: "Imbalance strategies evaluation"
+output: html_notebook
+---
+```{r}
+library(readr)
+library(dplyr)
+library(broom)
+library(stringr)
+library(ggplot2)
+```
+
+```{r}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-downsampling-epochs=60-endgame-maxlen=200-\\d+")
+
+#str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_lstm_downsample <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_downsample <-do.call(rbind,results_lstm_downsample)
+
+
+
+```
+
+
+```{r}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-upsampling-epochs=60-endgame-maxlen=200-\\d+")
+
+#str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_lstm_upsample <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_upsample <-do.call(rbind,results_lstm_upsample)
+
+
+```
+
+
+
+
+
+```{r}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-augmenting-epochs=60-endgame-maxlen=200-\\d+")
+
+#str_replace(string = "results_test_ctu13-lstm_endgame-80-1.csv",pattern = ".*-([0-9]+)-[0-9]+.csv","\\1")
+
+results_lstm_augment <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_augment <-do.call(rbind,results_lstm_augment)
+
+
+```
+
+
+```{r}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-augmenting-botnet-epochs=60-endgame-maxlen=200-\\d+")
+results_lstm_augment4x <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_augment4x <-do.call(rbind,results_lstm_augment4x)
+
+files %>% length()
+```
+
+```{r fig.height=6, fig.width=7}
+
+results<-rbind(results_lstm_upsample %>% tibble::add_column(imbalance="upsample"),
+               results_lstm_downsample %>% tibble::add_column(imbalance="downsample"), 
+               results_lstm_augment %>% tibble::add_column(imbalance="aug-norm"),
+               results_lstm_augment4x %>% tibble::add_column(imbalance="aug-norm-bot"))
+
+
+results %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity")) %>%
+  ggplot() +
+  labs(title="Imbalance Strategies [30 executions]",
+        subtitle="LSTM arch. according to Woodbridge et al. (2016):\nmaxlen 200, epochs 60",
+        caption="Original sample contains:  ~1800 botnets and ~180 normal data points.\n
+       aug-norm and aug-norm-bot use a sliding window over sequence for generate new samples. ")+
+  
+  geom_boxplot(aes(x=as.factor(imbalance),y=value,fill=as.factor(imbalance)),color='gray')+
+  xlab("Strategy")+
+  theme_bw()+
+  ggdark::dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "fixed")
+```
+
+
+```{r include=FALSE}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-sample20-augment-botnetx2-epochs=60-endgame-maxlen=200-\\d+")
+results_lstm_augment_sample20x2 <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_augment_sample20x2 <-do.call(rbind,results_lstm_augment_sample20x2)
+
+files %>% length()
+```
+
+```{r include=FALSE}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-sample20-augment-botnet-epochs=60-endgame-maxlen=200-\\d+")
+results_lstm_augment_sample20x3 <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_augment_sample20x3 <-do.call(rbind,results_lstm_augment_sample20x3)
+
+files %>% length()
+```
+
+```{r include=FALSE}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-sample20-augment-botnetx5-epochs=60-endgame-maxlen=200-\\d+")
+results_lstm_augment_sample20x5 <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_augment_sample20x5 <-do.call(rbind,results_lstm_augment_sample20x5)
+
+files %>% length()
+```
+
+```{r include=FALSE}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-sample20-downsample-botnet-epochs=60-endgame-maxlen=200-\\d+")
+results_lstm_downsample_sample20 <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_downsample_sample20 <-do.call(rbind,results_lstm_downsample_sample20)
+
+files %>% length()
+```
+
+```{r include=FALSE}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-sample20-upsample-botnet-epochs=60-endgame-maxlen=200-\\d+")
+results_lstm_upsample_sample20 <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_upsample_sample20 <-do.call(rbind,results_lstm_upsample_sample20)
+
+files %>% length()
+```
+
+```{r include=FALSE}
+files <- list.files(path = "../results/",pattern="results_test_imbalance-sample20-augment-dataset-2x-epochs=60-endgame-maxlen=200-\\d+")
+results_lstm_augment_sample20x2_dataset <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(maxlen=as.integer(str_replace(string = x ,pattern = ".*=([0-9]+)-[0-9]+.csv","\\1") ))
+                )
+
+results_lstm_augment_sample20x2_dataset <-do.call(rbind,results_lstm_augment_sample20x2_dataset)
+
+files %>% length()
+```
+```{r fig.height=8, fig.width=7}
+
+results<-rbind(results_lstm_upsample_sample20 %>% tibble::add_column(imbalance="upsample-20"),
+               results_lstm_downsample_sample20 %>% tibble::add_column(imbalance="downsample-20"), 
+               #results_lstm_augment_sample20x2 %>% tibble::add_column(imbalance="aug-norm-bot-20x2"),
+               #results_lstm_augment_sample20x3 %>% tibble::add_column(imbalance="aug-norm-bot-20x3"),
+               #results_lstm_augment_sample20x5 %>% tibble::add_column(imbalance="aug-norm-bot-20x5"),
+               results_lstm_augment_sample20x2_dataset %>% tibble::add_column(imbalance="aug-norm-bot-20x2-dat")
+               
+               
+               #results_lstm_upsample %>% tibble::add_column(imbalance="upsample-10"),
+               #results_lstm_downsample %>% tibble::add_column(imbalance="downsample-10"),
+        
+               #results_lstm_augment %>% tibble::add_column(imbalance="aug-norm-bot-10")
+               
+               )
+
+
+results %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity")) %>%
+  ggplot() +
+  labs(title="Imbalance Strategies [30 executions]",
+        subtitle="LSTM arch. according to Woodbridge et al. (2016):\nmaxlen 200, epochs 60",
+        caption="Original sample contains:  ~3600 botnets and ~400 normal data points [20% of pop.]\n
+       aug-norm-bot use a sliding window over a random sequence for generate new samples.\n
+       x2 refers to different number of augmented samples.\n
+       No significative differences observed between upsample and aug-norm-botx2
+       ")+
+  
+  geom_boxplot(aes(x=as.factor(imbalance),y=value,fill=as.factor(imbalance)),color='gray')+
+  xlab("Strategy")+
+  theme_bw()+
+  ggdark::dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric, scales = "fixed")
+```
+```{r}
+balanced_accuracy_augment20x3<-results_lstm_augment_sample20x3 %>% filter(metric=="Balanced Accuracy") %>% select(value)
+balanced_accuracy_augment20x5<-results_lstm_augment_sample20x5 %>% filter(metric=="Balanced Accuracy") %>% select(value)
+balanced_accuracy_augment20x2<-results_lstm_augment_sample20x2 %>% filter(metric=="Balanced Accuracy") %>% select(value)
+balanced_accuracy_upsample20<-results_lstm_upsample_sample20 %>% filter(metric=="Balanced Accuracy") %>% select(value)
+balanced_accuracy_downsample20<-results_lstm_downsample_sample20 %>% filter(metric=="Balanced Accuracy") %>% select(value)
+balanced_accuracy_augment20x2_dataset<-results_lstm_augment_sample20x2_dataset %>% filter(metric=="Balanced Accuracy") %>% select(value)
+
+
+balanced_accuracy_augment20x2_dataset %>% select(value) %>%
+  ggplot()+
+  geom_histogram(aes(x=value),fill='skyblue',color='black')+
+  ggdark::dark_theme_bw()
+
+```
+
+```{r}
+balanced_accuracy_augment20x2_dataset %>%
+  ggplot()+
+  geom_qq(aes(sample=value),color='orange')+
+  ggdark::dark_theme_bw()
+
+balanced_accuracy_augment20x2_dataset %>% unlist() %>%
+  shapiro.test()
+
+```
+
+```{r}
+n<-balanced_accuracy_augment20x2_dataset %>% length()
+mu<-mean(balanced_accuracy_augment20x2_dataset %>% unlist())
+s<-sd(balanced_accuracy_augment20x2_dataset %>% unlist())
+error<- qnorm(0.975)*s/sqrt(n)
+c(mu+error,mu-error)
+```
+```{r}
+wilcox.test(balanced_accuracy_augment20x3 %>% unlist(),
+            balanced_accuracy_augment20x2 %>% unlist()
+            )
+
+augment_results<-data.frame(downsmaple=balanced_accuracy_downsample20 %>% unlist(),
+           augment20x2_dataset=balanced_accuracy_augment20x2_dataset %>% unlist(),
+          
+           upsample=balanced_accuracy_upsample20 %>% unlist()
+           #downsample=balanced_accuracy_downsample20 %>% unlist()
+            
+           ) %>% reshape2::melt() 
+
+oneway.test(value~variable,data=augment_results) %>% broom::tidy()
+
+
+```
+## Model Evaluation
+### LSTM
+```{r fig.height=6, fig.width=10}
+files <- list.files(path = "../results/",pattern="results_test_lstm-endgame-augmented-ctu19-mccv-epochs=15-endgame-maxlen=1000-\\d+-lstm_size=\\d+-embedingdim=\\d+-dropout=[0-9.]+.csv")
+
+results_lstm_tune <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(lstm_size=as.integer(str_replace(string = x ,pattern = ".*-lstm_size=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(embedingdim=as.integer(str_replace(string = x ,pattern = ".*-embedingdim=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(dropout=as.numeric(str_replace(string = x ,pattern = ".*-dropout=([0-9]+.[0-9]).csv","\\1") ))
+               %>% tibble::add_column(sample=as.factor(str_replace(string = x ,pattern = ".*=1000-(\\d+)-.*.csv","\\1") ))
+          
+                )
+
+results_lstm_tune <-do.call(rbind,results_lstm_tune)
+results_lstm_tune %>% group_by(sample) %>% summarise(n=n())
+```
+
+```{r fig.height=6, fig.width=10}
+
+results_lstm_tune<-results_lstm_tune %>% tidyr::unite("parameters",lstm_size:embedingdim:dropout) %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity"))
+
+results_lstm_tune %>% ggplot()+
+  geom_boxplot(aes(y=value,x=parameters,fill=parameters),color='gray')+
+  labs(title="Parameters Tuning: LSTM Woodbridge (2016)",subtitle ="Parameteres: <lstm_size>_<embeding_size>_<dropout>")+
+  xlab("Parameters")+
+  ggdark::dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric)
+
+```
+
+```{r}
+results_lstm_tune_ordered<-results_lstm_tune %>% filter(metric=="Balanced Accuracy") %>% select(value,parameters) %>% group_by(parameters) %>%  summarise(mean=mean(value),sd=sd(value))  %>% arrange(desc(mean))
+
+results_lstm_tune_ordered$parameters<-factor(results_lstm_tune_ordered$parameters,levels=unique(results_lstm_tune_ordered$parameters))
+
+
+lstm_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_lstm_tune_ordered)+
+   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,color='yellow')+
+   geom_point(color='red')+
+  ylab("Mean Balanced Accuracy")+
+    ggdark::dark_theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+   theme(legend.position="none")+
+   ylim(0.85,0.95)+
+   labs(title="Parameters Tuning: LSTM Woodbridge (2016)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <lstm_size>_<embeding_size>_<dropout>")
+  
+lstm_sd_plot
+```
+## CNN1D
+```{r fig.height=6, fig.width=10}
+files <- list.files(path = "../results/",pattern="results_test_cnn1d-cacic-augmented-ctu19-mccv-epochs=15-endgame-maxlen=1000-\\d+-nb_filter=\\d+-kernel_size=\\d+-embedingdim=\\d+-hidden_size=\\d+.csv")
+
+results_cnn1d_tune <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(nb_filter=as.integer(str_replace(string = x ,pattern = ".*-nb_filter=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(embedingdim=as.integer(str_replace(string = x ,pattern = ".*-embedingdim=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(kernel_size=as.numeric(str_replace(string = x ,pattern = ".*-kernel_size=([0-9]+)-.*.csv","\\1") ))
+              %>% tibble::add_column(hidden_size=as.numeric(str_replace(string = x ,pattern = ".*-hidden_size=([0-9]+).csv","\\1") ))
+              
+               %>% tibble::add_column(sample=as.factor(str_replace(string = x ,pattern = ".*=1000-(\\d+)-.*.csv","\\1") ))
+          
+                )
+
+results_cnn1d_tune <-do.call(rbind,results_cnn1d_tune)
+results_cnn1d_tune %>% group_by(sample) %>% summarise(n=n())
+```
+
+
+```{r fig.height=6, fig.width=10}
+
+results_cnn1d_tune<-results_cnn1d_tune %>% tidyr::unite("parameters",nb_filter:embedingdim:kernel_size:hidden_size) %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity"))
+
+results_cnn1d_tune %>% ggplot()+
+  geom_boxplot(aes(y=value,x=parameters,fill=parameters),color='gray')+
+  labs(title="Parameters Tuning: CNN1D Catania (2018)",subtitle ="Parameteres: <nb_filter>_<embeding_size>_<kernel_size>_<hidden_size>")+
+  xlab("Parameters")+
+  ggdark::dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric)
+
+```
+
+```{r}
+
+results_cnn1d_tune_ordered <- results_cnn1d_tune %>% filter(metric=="Balanced Accuracy") %>% select(value,parameters) %>% group_by(parameters) %>%  summarise(mean=mean(value),sd=sd(value)) %>% arrange(desc(mean))
+
+results_cnn1d_tune_ordered$parameters<-factor(results_cnn1d_tune_ordered$parameters,levels=unique(results_cnn1d_tune_ordered$parameters))
+
+cnn1d_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_cnn1d_tune_ordered)+
+   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,color='yellow')+
+   geom_point(color='red')+
+  ylab("Mean Balanced Accuracy")+
+    ggdark::dark_theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+   theme(legend.position="none")+
+   ylim(0.85,0.95)+
+   labs(title="Parameters Tuning: CNN1D Catania (2018)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <nb_filter>_<embeding_size>_<kernel_size>_<hidden_size>")
+
+cnn1d_sd_plot
+```
+```{r fig.height=6, fig.width=12}
+gridExtra::grid.arrange(lstm_sd_plot,cnn1d_sd_plot,ncol=2)
+```
+

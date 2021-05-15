@@ -1,0 +1,329 @@
+---
+title: "CTU19 split and sampling "
+output: 
+  html_notebook: 
+    code_folding: show
+    theme: cerulean
+---
+`r date()`
+
+```{r}
+library(readr)
+library(dplyr)
+library(stringr)
+library(purrr)
+library(ggplot2)
+library(skimr)
+
+```
+
+## All the analysis is done for sequence length = 1000
+```{r}
+seq_maxlen=1000
+```
+
+## Helper Functions
+### Efron's similarity function
+```{r}
+library(randomForest)
+library(tidyr)
+library(dplyr)
+
+efron_simil<-function(train,prec_len){
+  train<-train %>% select(1:prec_len)
+  predictor_order<-sample(1:prec_len,prec_len)
+  train_permuted<-train[,predictor_order]
+  names(train_permuted)<-names(train)
+  train_permuted$dataset<- "random"
+  train$dataset<- "original"
+  train<-rbind(train_permuted,train)
+  train_model<-randomForest::randomForest(x=train[,1:prec_len],
+  y=as.factor(train$dataset))
+}
+
+```
+### PCA 2D Visualization function
+```{r}
+source("../../deepseq/config.R") # required for using deepseq #remove opt$dataset from config to use
+source("../../deepseq/preprocess.R") # required for padding function
+# ctu19_filtered_first4removed.csv was generated in other notebook ctu19-analysis.rmd 
+ctu19_first4removed<-read_csv("../datasets/ctu19_filtered_first4removed.csv")
+
+tokenize <- function(data){
+  sequencel<-sapply(data,function(x)  strsplit(x,split=""))
+  x_data <- lapply(sequencel,function(x) sapply(x,function(x) tokens[[x]]))
+  }
+
+create_padded_seq<-function(data,maxlen=seq_maxlen){
+tokenized_seq <- tokenize(data$State)
+padded_seq<-pad_sequences_fast(unname(tokenized_seq),maxlen=maxlen,padding='post', truncating='post')
+padded_seq<-data.frame(seq=padded_seq,label=data$LabelName,source=data$source, id=data$id)
+}
+
+
+create_pca<-function(data,maxlen=seq_maxlen)
+{  
+pca<-prcomp(data[,1:maxlen],center=TRUE,scale.=TRUE)
+  summary(pca)
+  pca_data<-data.frame(pca$x,label=data$label,source=data$source, id=data$id)
+  pca_plot<-ggplot(pca_data,aes(x=PC1,y=PC2))+
+    geom_point(aes(color=label),alpha=0.5,size=0.1)+
+    ylim(c(-40,40))+
+    xlim(c(-80,80))+
+    ggdark::dark_theme_bw()
+pca_plot
+}
+```
+
+## PCA 2D of CTU19
+```{r}
+padded_seq<-create_padded_seq(ctu19_first4removed,maxlen=seq_maxlen)
+pca_plot<-create_pca(padded_seq,maxlen=seq_maxlen)
+pca_plot 
+#create_pca(padded_seq %>% filter(source=="2017-05-02_kali-normal.pcap.tsv"))
+#create_pca(padded_seq %>% filter(source=="2014-01-31_capture-win7.pcap.tsv"))
+#create_pca(padded_seq %>% filter(source=="2014-03-12_capture-win3.pcap.tsv"))
+#create_pca(padded_seq %>% filter(source=="2013-11-25_capture-win7-2.pcap.tsv"))
+#create_pca(padded_seq %>% filter(source=="2015-03-24_capture1-only-dns.pcap.tsv"))
+```
+
+
+## PCA 2D of CTU19 and the 19 data sources.
+
+
+```{r fig.width=14}
+pca_plot + facet_wrap(~source) + labs(title="PCA vizualization of the CTU19", subtitle="Different sources", caption="Sequences were tokenized and padded using deepseq framework with a maxlen=1000")
+
+gridExtra::grid.arrange(pca_plot  + labs(title="PCA vizualization of the CTU19", subtitle="Full Dataset and different sources"),
+                        pca_plot + theme(legend.position = "none") + facet_wrap(~source) +labs(caption="Sequences were tokenized and padded using deepseq framework with a maxlen=1000"),ncol=2)
+```
+
+## Analysis of CTU19 for building CTU19A(train) and CTU19B(test)
+
+A subset of CTU19 data sources is removed for building a test set.
+The resulting CTU19A and CTU19B. Datasets with less than 3/4 sequences are also removed.
+```{r}
+
+CTU19B_datasets<-c( #"2017-05-02_kali-normal.pcap.tsv",
+                    "2014-01-31_capture-win7.pcap.tsv",
+                    "2014-01-25_capture_win3.pcap.tsv",
+                    "2013-08-20_capture-win2.pcap.tsv",
+                   "2017-04-25_win-normal.pcap.tsv",
+                   "2014-02-10_capture-win3.pcap.tsv",
+                   "2013-11-25_capture-win7-2.pcap.tsv",
+                   "2013-12-17_capture1.pcap.tsv"
+                )
+# Removed because number of sequences  <3
+CTU19_removed<-c('2014-02-07_capture-win3.pcap.tsv',
+'2015-03-24_capture1-only-dns.pcap.tsv',	
+'2017-07-03_capture-win2.pcap.tsv')
+
+CTU19A_seq<-padded_seq %>% filter( ! source %in%  CTU19B_datasets )
+CTU19A_seq<-CTU19A_seq %>% filter( ! source %in%  CTU19_removed )
+CTU19B_seq<-padded_seq %>% filter(  source %in%  CTU19B_datasets )
+CTU19A_seq$set<-"CTU19A"
+CTU19B_seq$set<-"CTU19B"
+```
+
+### Checking whether CTU19A and CTU19B include the correct number of datasets
+```{r}
+CTU19A_seq %>% group_by(source) %>% summarize(n=n())
+CTU19B_seq %>% group_by(source) %>% summarize(n=n())
+
+```
+
+### The new CTU19A and CTU19B are visualizad using PCA.
+
+```{r}
+CTU19A_nrow<-CTU19A_seq %>% nrow()
+gridExtra::grid.arrange(create_pca(CTU19A_seq)+
+                          labs(title="CTU19A",subtitle=paste(
+                                                             " Botnet:", 
+                                                             CTU19A_seq %>% filter(label =="Botnet") %>% nrow,
+                                                             " Normal:", 
+                                                             CTU19A_seq %>% filter(label !="Botnet") %>% nrow )
+                               ),
+                          create_pca(CTU19B_seq)+
+                          labs(title="CTU19B",subtitle=paste(
+                                                             " Botnet:", 
+                                                             CTU19B_seq %>% filter(label =="Botnet") %>% nrow,
+                                                             " Normal:", 
+                                                             CTU19B_seq %>% filter(label !="Botnet") %>% nrow )
+                               
+                               
+                            )
+                          )
+
+```
+
+### Create Train/test (CTU19) csv files 
+```{r}
+CTU19A_seq %>% group_by(label) %>% summarize(n=n())
+CTU19A_csv <- inner_join(ctu19_first4removed,CTU19A_seq %>% select(id), by="id")
+CTU19B_csv <- inner_join(ctu19_first4removed,CTU19B_seq %>% select(id), by="id")
+readr::write_csv(CTU19A_csv,path="../datasets/samples/CTU19A-first4-removed.csv")
+readr::write_csv(CTU19B_csv,path="../datasets/samples/CTU19B-first4-removed.csv")
+
+CTU19A_csv %>% group_by(source) %>% summarize(n=n())
+CTU19B_csv %>% group_by(source) %>% summarize(n=n())
+```
+
+## Select Sample Size
+We apply Efron's algorithm for selecting different sample proportions and then classify the remaining CTU19 as `original` or `random`. Ideally the 100% of the remaining CTU19 should be considered as `original`.
+
+
+```{r}
+library(doMC)
+library(rsample)
+registerDoMC(cores=11)
+
+prop_results<-list()
+for (proportion in c(0.1,0.2,0.3,0.4,0.5)){
+  partial_results<-c()
+#  for (repetition in 1:10){
+  results <- foreach(repetition = 1:22, .combine = rbind) %dopar% {
+    CTU19A_split<-rsample::initial_split(CTU19A_seq,prop =proportion, strata=source)
+    CTU19A_seq_sample<-training(CTU19A_split)
+    CTU19A_seq_sample_test<-testing(CTU19A_split)
+    CTU19A_seq_sample %>% nrow()
+    
+    m<-efron_simil(CTU19A_seq_sample,seq_maxlen)
+    predictions_prob<-predict(m, CTU19A_seq_sample_test, type="prob")
+    partial_results<-c(partial_results,mean(predictions_prob[,1]))
+  }
+  prop_results<-rbind(prop_results,c(mean(results),sd(results)))
+}
+data.frame(mean=prop_results[,1] %>% unlist(),sd=prop_results[,2] %>% unlist(), id=seq(10,50,10)) %>% ggplot(aes(x=id,y=mean))+
+   geom_point(color='red') +
+  ylab("Probability [mean and sd]")+
+  xlab("Percentage of the population sampled")+
+  labs(title="Efron's Algorithm for Sample Similarity",subtitle="A Random Forest on sample data is used to calculate the similarity \nto the CTU19A in terms of the 'original' class probability.")+
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,color='yellow')+
+  ggdark::dark_theme_bw()
+ 
+```
+
+### PCA 2D visualization for comparing CTU19 and a 20% sample.
+```{r}
+ CTU19A_split<-rsample::initial_split(CTU19A_seq,prop =0.2, strata=NULL)
+    CTU19A_seq_sample<-training(CTU19A_split)
+    CTU19A_seq_sample_test<-testing(CTU19A_split)
+    gridExtra::grid.arrange(create_pca(CTU19A_seq_sample)+labs(title="20% Sample")
+                            ,create_pca(CTU19A_seq)+labs(title="CTU19A Population"))
+    
+CTU19A_seq_sample %>% group_by(source) %>% summarise(n=n())
+CTU19A_seq %>% group_by(source) %>% summarise(n=n()) %>% arrange(n)
+
+```
+
+## Create 30 samples using pseudo Monte Carlo CV
+Shuffle the dataset and pick ~4000 for training and ~1000 for test. Repeat 30 times.
+```{r}
+workdir="/home/gab/dga-wb-r/datasets/samples/"
+resample_mc_cv<-function(x){
+  train_ind <- sample(seq_len(nrow(x)), size = nrow(x))
+  #train<-x[train_ind[1:2000],]
+  #test<-x[train_ind[2001:3000],]
+  train<-x[train_ind[1:4000],]
+  test<-x[train_ind[4001:5000],]
+  return (list(train=train,test=test))
+}
+for (iter in seq(30)){
+    resample_mc_cv_datasets<-resample_mc_cv(CTU19A_csv)
+    readr::write_csv(resample_mc_cv_datasets$train,path=paste0(workdir,"sample20-CTU19A-mc-train-",iter,".csv"))
+    readr::write_csv(resample_mc_cv_datasets$test,path=paste0(workdir,"sample20-CTU19A-mc-test-",iter,".csv"))
+}
+
+CTU19A_sample<-readr::read_csv("../datasets/samples/sample20-CTU19A-mc-train-6.csv")
+CTU19A_sample_padded_seq<-create_padded_seq(CTU19A_sample,maxlen=seq_maxlen)
+pca_plot_CTU19A_sample_padded_seq<-create_pca(CTU19A_sample_padded_seq,maxlen=seq_maxlen)
+
+CTU19A_sample %>% group_by(source) %>% summarise(n=n())
+CTU19A_sample %>% group_by(LabelName) %>% summarise(n=n())
+pca_plot_CTU19A_sample_padded_seq+labs(title="PCA of a training sample with 20% of the CTU19A")
+
+
+```
+
+### Checking if all train samples include the 9 sources from CTU19A
+```{r}
+files <- list.files(path = workdir,pattern="sample20-CTU19A-mc-train-\\d+")
+samples_files <- lapply(files, function(x) 
+                read_csv(paste(workdir,x,sep=""))   
+                %>% tibble::add_column(sample=as.integer(str_replace(string = x ,pattern = "sample20-CTU19A-mc-train-(\\d+).csv","\\1") ))
+                )
+samples_files <-do.call(rbind,samples_files)
+samples_files %>% group_by(source,sample) %>% summarise(n=n()) %>% group_by(sample) %>% summarise(sources=n())
+```
+
+### Checking if all test samples include the 9 sources from CTU19A
+```{r}
+files <- list.files(path = workdir,pattern="sample20-CTU19A-mc-test-\\d+")
+samples_files <- lapply(files, function(x) 
+                read_csv(paste(workdir,x,sep=""))   
+                %>% tibble::add_column(sample=as.integer(str_replace(string = x ,pattern = "sample20-CTU19A-mc-test-(\\d+).csv","\\1") ))
+                )
+samples_files <-do.call(rbind,samples_files)
+samples_files %>% group_by(source,sample) %>% summarise(n=n()) %>% group_by(sample) %>% summarise(sources=n())
+```
+
+### Resulting datasets and samples
+
+The final version of CTU19A and CTU19B as well as the 10% and 20% samples are located [here](https://www.dropbox.com/sh/ijiepa3l8zxy8lu/AABPDFjo9eMNPra_3SfPZyeNa?dl=0)
+
+# Augmentation
+## Helper functions
+### Shifter
+```{r}
+shifter <- function(x, n = 1) {
+  if (n == 0) x else c(tail(x, -n), head(x, n))
+}
+
+augment_dataset <- function(dataset, n) {
+  aug_dataset <- dataset[1,] # use first row for adding
+  for (i in 1:n) {
+  j <- sample(1:nrow(dataset), 1)
+  k <- sample(1:nchar(dataset$State[j]), 1)
+  aug_example <- dataset[j, ]
+  aug_example$State <- aug_example$State %>%
+  strsplit(split = "") %>%
+  unlist() %>%
+  shifter(n = k) %>%
+  paste(collapse = '')
+  aug_example$source <-
+  paste(aug_example$source, "_augmented", sep = "")
+  aug_example$id <- aug_example$id + 1e6
+ # aug_dataset <- rbind(aug_dataset, aug_example)
+  aug_dataset <- aug_dataset %>% tibble::add_row(aug_example)
+  }
+  aug_dataset[-1,] # remove first row
+}
+```
+### Generating augmented examples
+```{r}
+workdir="/home/gab/dga-wb-r/datasets/samples/"
+
+for (iter in seq(30)){
+    train_ex<-readr::read_csv(paste0(workdir,"sample20-CTU19A-mc-train-",iter,".csv"))
+    train_ex_normal <-train_ex %>% filter(LabelName == "Normal")
+    train_ex_normal_aug<-augment_dataset(train_ex_normal,
+                                         (train_ex %>% nrow*2 - train_ex_normal %>% nrow))
+    train_ex <- rbind(train_ex,train_ex_normal_aug)
+    
+    train_ex_botnet <-train_ex %>% filter(LabelName == "Botnet")
+    train_ex_normal <-train_ex %>% filter(LabelName == "Normal")
+    train_ex_botnet_aug<-augment_dataset(train_ex_botnet,
+                                         (train_ex_normal %>% nrow - train_ex_botnet %>% nrow))
+    
+    train_ex <- rbind(train_ex,train_ex_botnet_aug)
+    
+    readr::write_csv(train_ex,path=paste0(workdir,"sample20-CTU19A-mc-train-augmentedx2-",iter,".csv"))
+    
+}
+CTU19A_sample_augmented<-readr::read_csv("../datasets/samples/sample20-CTU19A-mc-train-augmentedx2-2.csv")
+
+CTU19A_sample_augmented %>% group_by(source) %>% summarise(n=n())
+CTU19A_sample_augmented %>% group_by(LabelName) %>% summarise(n=n())
+
+```
+
