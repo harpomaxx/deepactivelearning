@@ -7,6 +7,7 @@ output:
 ---
 `r date()`
 
+# Title
 ```{r}
 library(readr)
 library(dplyr)
@@ -299,7 +300,7 @@ augment_dataset <- function(dataset, n) {
   aug_dataset[-1,] # remove first row
 }
 ```
-### Generating augmented examples
+## Generating augmented examples
 ```{r}
 workdir="/home/gab/dga-wb-r/datasets/samples/"
 
@@ -325,5 +326,30 @@ CTU19A_sample_augmented<-readr::read_csv("../datasets/samples/sample20-CTU19A-mc
 CTU19A_sample_augmented %>% group_by(source) %>% summarise(n=n())
 CTU19A_sample_augmented %>% group_by(LabelName) %>% summarise(n=n())
 
+```
+## Generating augmented training set
+
+```{r}
+workdir="/home/harpo/hostdir/dga-wb-r/datasets/samples/"
+
+train_ex<-readr::read_csv(paste0(workdir,"CTU19A-first4-removed.csv"))
+train_ex_normal <-train_ex %>% filter(LabelName == "Normal")
+train_ex_normal_aug<-augment_dataset(train_ex_normal,
+                                     (train_ex %>% nrow*2 - train_ex_normal %>% nrow))
+train_ex <- rbind(train_ex,train_ex_normal_aug)
+
+train_ex_botnet <-train_ex %>% filter(LabelName == "Botnet")
+train_ex_normal <-train_ex %>% filter(LabelName == "Normal")
+train_ex_botnet_aug<-augment_dataset(train_ex_botnet,
+                                     (train_ex_normal %>% nrow - train_ex_botnet %>% nrow))
+
+train_ex <- rbind(train_ex,train_ex_botnet_aug)
+
+readr::write_csv(train_ex,file=paste0(workdir,"CTU19A-first4-removed-augmentedx2.csv"))
+
+CTU19A_augmented<-readr::read_csv(paste0(workdir,"CTU19A-first4-removed-augmentedx2.csv"))
+
+CTU19A_augmented %>% group_by(source) %>% summarise(n=n())
+CTU19A_augmented %>% group_by(LabelName) %>% summarise(n=n())
 ```
 
