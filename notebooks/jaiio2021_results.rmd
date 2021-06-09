@@ -365,3 +365,45 @@ cnn1d_sd_plot
 gridExtra::grid.arrange(lstm_sd_plot,cnn1d_sd_plot,ncol=2)
 ```
 
+```{r}
+final_att1<- readr::read_csv("/home/harpo/hostdir/dga-wb-r/results/cacic2021-test-only/results_ctu19b_awc-batch_size=1024-lstm_size=128-embedingdim=128-dropout=0.1.csv")
+final_att1$model<-"att1"
+final_att2<- readr::read_csv("/home/harpo/hostdir/dga-wb-r/results/cacic2021-test-only/results_ctu19b_awc-batch_size=256-lstm_size=32-embedingdim=32-dropout=0.1.csv")
+final_att2$model<-"att2"
+
+final_lstm1<- readr::read_csv("/home/harpo/hostdir/dga-wb-r/results/cacic2021-test-only/results_test_lstm-endgame-augmented-ctu19-mccv-epochs=15-endgame-batch=1024-maxlen=1000-embedingdim=64-lstm_size=32-dropout=0.1-test-only.csv") %>% filter(metric %in% c("Balanced Accuracy", "Sensitivity","Specificity","F1"))
+final_lstm1$model<-"lstm1"
+
+final_lstm2<- readr::read_csv("/home/harpo/hostdir/dga-wb-r/results/cacic2021-test-only/results_test_lstm-endgame-augmented-ctu19-mccv-epochs=15-endgame-batch=256-maxlen=1000-embedingdim=64-lstm_size=64-dropout=0.1-test-only.csv") %>% filter(metric %in% c("Balanced Accuracy", "Sensitivity","Specificity","F1"))
+
+final_lstm2$model<-"lstm2"
+
+
+
+final_cnn1d1<- readr::read_csv("/home/harpo/hostdir/dga-wb-r/results/cacic2021-test-only/results_test_cnn1d-augmented-ctu19-mccv-epochs=15-endgame-batch=1024-maxlen=1000-nb_filter=256-embedingdim=128-kernel_size=4-hidden_size=128-test-only.csv") %>% filter(metric %in% c("Balanced Accuracy", "Sensitivity","Specificity","F1"))
+final_cnn1d1$model<-"cnn1D1"
+
+final_cnn1d2<- readr::read_csv("/home/harpo/hostdir/dga-wb-r/results/cacic2021-test-only/results_test_cnn1d-augmented-ctu19-mccv-epochs=15-endgame-batch=256-maxlen=1000-nb_filter=128-embedingdim=128-kernel_size=4-hidden_size=256-test-only.csv") %>% filter(metric %in% c("Balanced Accuracy", "Sensitivity","Specificity","F1"))
+final_cnn1d2$model<-"cnn1D2"
+
+
+
+library(kableExtra)
+rbind(final_att1,
+      final_att2,
+      final_lstm1,
+      final_lstm2,
+      final_cnn1d1,
+      final_cnn1d2)  %>% tidyr::pivot_wider(names_from = metric, values_from = value)  %>% 
+  kbl(caption = "Final models trained with CTU19A and tested in CTU19B", align = 'c') %>% 
+  
+  
+   column_spec(4, bold = c(0,1,0,0,1,1), width_max = 1) %>%
+    column_spec(5, bold = c(1,0,0,0,1,1)) %>%
+  column_spec(2, bold = c(0,1,1,1,0,0)) %>%
+  column_spec(3, bold = c(1,0,0,0,1,1)) %>%
+  
+  kableExtra::kable_classic_2(full_width = F, html_font = "Cambria")
+
+```
+
