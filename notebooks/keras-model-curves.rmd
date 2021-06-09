@@ -1,0 +1,33 @@
+---
+title: "Keras Models Curves"
+output: html_notebook
+---
+
+
+```{r fig.height=8, fig.width=10}
+history<-read_csv("/home/gab/dga-wb-r/results/results_history_test_kk-6-lstm-lstm_size=128-embedingdim=128-dropout=0.5.csv",col_types = cols())
+
+loss_plot<-ggplot(history %>% filter(metric=="loss"))+
+  facet_wrap(~data)+
+  geom_point(aes(x=epoch,y=value),col='orange',alpha=0.9)+
+  geom_smooth(aes(x=epoch,y=value),se=FALSE,size=0.5,alpha=0.5,color='red')+
+  
+  geom_line(aes(x=epoch,y=value),col='orange',alpha=0.9)+
+  ggdark::dark_theme_bw()+ labs(title="Loss values for Training and Validation sets ")
+
+
+acc_plot<-ggplot(history %>% filter(metric=="acc"))+
+  facet_wrap(~data)+
+  geom_point(aes(x=epoch,y=value),col='orange',alpha=0.9)+
+  geom_smooth(aes(x=epoch,y=value),se=FALSE, size=0.5,alpha=0.5,color='red')+
+  
+  geom_line(aes(x=epoch,y=value),col='orange',alpha=0.9)+
+  ggdark::dark_theme_bw()+ labs(title="Accuracy values for Training and Validation sets ")
+
+gridExtra::grid.arrange(loss_plot,acc_plot,ncol=1)
+```
+
+```{r}
+plotly::ggplotly(acc_plot)
+```
+

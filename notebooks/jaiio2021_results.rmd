@@ -258,7 +258,8 @@ oneway.test(value~variable,data=augment_results) %>% broom::tidy()
 
 ```
 ## Model Evaluation
-### LSTM
+## LSTM
+### Batch 1024
 ```{r fig.height=6, fig.width=10}
 files <- list.files(path = "../results/",pattern="results_test_lstm-endgame-augmented-ctu19-mccv-epochs=15-endgame-maxlen=1000-\\d+-lstm_size=\\d+-embedingdim=\\d+-dropout=[0-9.]+.csv")
 
@@ -303,14 +304,60 @@ lstm_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_lstm_tune_ordered)+
     ggdark::dark_theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
    theme(legend.position="none")+
-   ylim(0.85,0.95)+
-   labs(title="Parameters Tuning: LSTM Woodbridge (2016)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <lstm_size>_<embeding_size>_<dropout>")
+   ylim(0.80,0.95)+
+   labs(title="Parameters Tuning: LSTM Woodbridge (2016)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <lstm_size>_<embeding_size>_<dropout>",caption="batch_size=1024")
   
 lstm_sd_plot
 ```
-## CNN1D
+
+### Batch 256
 ```{r fig.height=6, fig.width=10}
-files <- list.files(path = "../results/",pattern="results_test_cnn1d-cacic-augmented-ctu19-mccv-epochs=15-endgame-maxlen=1000-\\d+-nb_filter=\\d+-kernel_size=\\d+-embedingdim=\\d+-hidden_size=\\d+.csv")
+files <- list.files(path = "../results/",
+                    pattern="results_test_lstm-endgame-augmented-ctu19-mccv-epochs=15-endgame-batch=256-maxlen=1000-\\d+-lstm_size=\\d+-embedingdim=\\d+-dropout=[0-9.]+.csv")
+
+results_lstm_256_tune <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(lstm_size=as.integer(str_replace(string = x ,pattern = ".*-lstm_size=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(embedingdim=as.integer(str_replace(string = x ,pattern = ".*-embedingdim=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(dropout=as.numeric(str_replace(string = x ,pattern = ".*-dropout=([0-9]+.[0-9]).csv","\\1") ))
+               %>% tibble::add_column(sample=as.factor(str_replace(string = x ,pattern = ".*=1000-(\\d+)-.*.csv","\\1") ))
+          
+                )
+
+results_lstm_256_tune <-do.call(rbind,results_lstm_256_tune)
+results_lstm_256_tune %>% group_by(sample) %>% summarise(n=n())
+```
+
+
+```{r}
+
+results_lstm_256_tune<-results_lstm_256_tune %>% tidyr::unite("parameters",lstm_size:embedingdim:dropout) %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity"))
+
+results_lstm_256_tune_ordered<-results_lstm_256_tune %>% filter(metric=="Balanced Accuracy") %>% select(value,parameters) %>% group_by(parameters) %>%  summarise(mean=mean(value),sd=sd(value))  %>% arrange(desc(mean))
+
+results_lstm_256_tune_ordered$parameters<-factor(results_lstm_256_tune_ordered$parameters,levels=unique(results_lstm_256_tune_ordered$parameters))
+
+
+lstm_256_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_lstm_256_tune_ordered)+
+   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,color='yellow')+
+   geom_point(color='red')+
+  ylab("Mean Balanced Accuracy")+
+    ggdark::dark_theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+   theme(legend.position="none")+
+   ylim(0.80,0.95)+
+   labs(title="Parameters Tuning: LSTM Woodbridge (2016)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <lstm_size>_<embeding_size>_<dropout>",caption="batch_size=256")
+  
+lstm_256_sd_plot
+```
+
+
+
+
+## CNN1D
+### Batch 1024
+```{r fig.height=6, fig.width=10}
+files <- list.files(path = "../results/",pattern="results_test_cnn1d-cacic-augmented-ctu19-mccv-epochs=15-endgame-batch=1024-maxlen=1000-\\d+-nb_filter=\\d+-kernel_size=\\d+-embedingdim=\\d+-hidden_size=\\d+.csv")
 
 results_cnn1d_tune <- lapply(files, function(x) 
                 read_csv(paste("../results/",x,sep=""))   
@@ -325,16 +372,17 @@ results_cnn1d_tune <- lapply(files, function(x)
 
 results_cnn1d_tune <-do.call(rbind,results_cnn1d_tune)
 results_cnn1d_tune %>% group_by(sample) %>% summarise(n=n())
+
 ```
 
 
 ```{r fig.height=6, fig.width=10}
 
 results_cnn1d_tune<-results_cnn1d_tune %>% tidyr::unite("parameters",nb_filter:embedingdim:kernel_size:hidden_size) %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity"))
-
+results_cnn1d_tune %>%  group_by(sample) %>% summarise(n=n())
 results_cnn1d_tune %>% ggplot()+
   geom_boxplot(aes(y=value,x=parameters,fill=parameters),color='gray')+
-  labs(title="Parameters Tuning: CNN1D Catania (2018)",subtitle ="Parameteres: <nb_filter>_<embeding_size>_<kernel_size>_<hidden_size>")+
+  labs(title="Parameters Tuning: CNN1D Catania (2018)",subtitle ="Parameteres: <nb_filter>_<embeding_size>_<kernel_size>_<hidden_size>",caption="batch_size=1024")+
   xlab("Parameters")+
   ggdark::dark_theme_gray()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
@@ -356,13 +404,210 @@ cnn1d_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_cnn1d_tune_ordered
     ggdark::dark_theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
    theme(legend.position="none")+
-   ylim(0.85,0.95)+
-   labs(title="Parameters Tuning: CNN1D Catania (2018)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <nb_filter>_<embeding_size>_<kernel_size>_<hidden_size>")
+  theme(axis.text=element_text(size=8))+
+   ylim(0.80,0.95)+
+   labs(title="Parameters Tuning: CNN1D Catania (2018)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <nb_filter>_<embeding_size>_<kernel_size>_<hidden_size>",caption="batch_size=1024")
 
 cnn1d_sd_plot
 ```
 ```{r fig.height=6, fig.width=12}
 gridExtra::grid.arrange(lstm_sd_plot,cnn1d_sd_plot,ncol=2)
+```
+### Batch 256
+```{r fig.height=6, fig.width=10}
+files <- list.files(path = "../results/",pattern="results_test_cnn1d-cacic-augmented-ctu19-mccv-epochs=15-endgame-maxlen=1000-\\d+-nb_filter=\\d+-kernel_size=\\d+-embedingdim=\\d+-hidden_size=\\d+.csv")
+
+results_cnn1d_256_tune <- lapply(files, function(x) 
+                read_csv(paste("../results/",x,sep=""))   
+                %>% tibble::add_column(nb_filter=as.integer(str_replace(string = x ,pattern = ".*-nb_filter=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(embedingdim=as.integer(str_replace(string = x ,pattern = ".*-embedingdim=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(kernel_size=as.numeric(str_replace(string = x ,pattern = ".*-kernel_size=([0-9]+)-.*.csv","\\1") ))
+              %>% tibble::add_column(hidden_size=as.numeric(str_replace(string = x ,pattern = ".*-hidden_size=([0-9]+).csv","\\1") ))
+              
+               %>% tibble::add_column(sample=as.factor(str_replace(string = x ,pattern = ".*=1000-(\\d+)-.*.csv","\\1") ))
+          
+                )
+
+results_cnn1d_256_tune <-do.call(rbind,results_cnn1d_256_tune)
+results_cnn1d_256_tune %>% group_by(sample) %>% summarise(n=n())
+```
+```{r}
+results_cnn1d_256_tune<-results_cnn1d_256_tune %>% tidyr::unite("parameters",nb_filter:embedingdim:kernel_size:hidden_size) %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity"))
+results_cnn1d_256_tune %>%  group_by(sample) %>% summarise(n=n())
+```
+```{r}
+results_cnn1d_256_tune_ordered <- results_cnn1d_256_tune %>% filter(metric=="Balanced Accuracy") %>% select(value,parameters) %>% group_by(parameters) %>%  summarise(mean=mean(value),sd=sd(value)) %>% arrange(desc(mean))
+
+results_cnn1d_256_tune_ordered$parameters<-factor(results_cnn1d_256_tune_ordered$parameters,levels=unique(results_cnn1d_256_tune_ordered$parameters))
+
+cnn1d_256_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_cnn1d_256_tune_ordered)+
+   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,color='yellow')+
+   geom_point(color='red')+
+  ylab("Mean Balanced Accuracy")+
+    ggdark::dark_theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+   theme(legend.position="none")+
+   theme(axis.text=element_text(size=8))+
+   ylim(0.80,0.95)+
+   labs(title="Parameters Tuning: CNN1D Catania (2018)",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <nb_filter>_<embeding_size>_<kernel_size>_<hidden_size>",caption="batch_size=256")
+
+cnn1d_256_sd_plot
+```
+
+## ATTENTION
+### Batch 1024
+
+
+
+
+```{r fig.height=6, fig.width=10}
+files <- list.files(path = "../results/juanma",pattern="results_test_awc-lstm_size%5C=\\d+-embedingdim%5C=\\d+-dropout%5C=[0-9.]+-metrics-\\d+.csv")
+
+results_att_tune <- lapply(files, function(x) 
+                read_csv(paste("../results/juanma/",x,sep=""))   
+                %>% tibble::add_column(lstm_size=as.integer(str_replace(string = x ,pattern = ".*-lstm_size%5C=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(embedingdim=as.integer(str_replace(string = x ,pattern = ".*-embedingdim%5C=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(dropout=as.numeric(str_replace(string = x ,pattern = ".*-dropout%5C=([0-9]+.[0-9])-metrics-\\d+.csv","\\1") ))
+               %>% tibble::add_column(sample=as.factor(str_replace(string = x ,pattern = ".*metrics-(\\d+).csv","\\1") ))
+          
+                )
+
+results_att_tune <-do.call(rbind,results_att_tune)
+results_att_tune %>% group_by(sample) %>% summarise(n=n())
+```
+
+```{r fig.height=6, fig.width=10}
+
+results_att_tune<-results_att_tune %>% tidyr::unite("parameters",lstm_size:embedingdim:dropout) %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity"))
+
+results_att_tune %>% ggplot()+
+  geom_boxplot(aes(y=value,x=parameters,fill=parameters),color='gray')+
+  labs(title="Parameters Tuning: Attention Yang (2016)",subtitle ="Parameters: <lstm_size>_<embeding_size>_<dropout>")+
+  xlab("Parameters")+
+  ggdark::dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric)
+
+```
+
+```{r fig.height=6, fig.width=10}
+results_att_tune_ordered<-results_att_tune %>% filter(metric=="Balanced Accuracy") %>% select(value,parameters) %>% group_by(parameters) %>%  summarise(mean=mean(value),sd=sd(value))  %>% arrange(desc(mean))
+
+results_att_tune_ordered$parameters<-factor(results_att_tune_ordered$parameters,levels=unique(results_att_tune_ordered$parameters))
+
+
+att_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_att_tune_ordered)+
+   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,color='yellow')+
+   geom_point(color='red')+
+  ylab("Mean Balanced Accuracy")+
+    ggdark::dark_theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+   theme(legend.position="none")+
+   ylim(0.80,0.95)+
+   labs(title="Parameters Tuning: Attention Yang (2016) ",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <lstm_size>_<embeding_size>_<dropout>",caption="batch_size=1024")
+  
+att_sd_plot
+```
+
+
+### Batch 256
+
+```{r fig.height=6, fig.width=10}
+files <- list.files(path = "../results/juanma",pattern="results_test_batch_size%5C=256-awc-lstm_size%5C=\\d+-embedingdim%5C=\\d+-dropout%5C=[0-9.]+-metrics-\\d+.csv")
+
+results_att_256tune <- lapply(files, function(x) 
+                read_csv(paste("../results/juanma/",x,sep=""))   
+                %>% tibble::add_column(lstm_size=as.integer(str_replace(string = x ,pattern = ".*-lstm_size%5C=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(embedingdim=as.integer(str_replace(string = x ,pattern = ".*-embedingdim%5C=([0-9]+)-.*.csv","\\1") ))
+               %>% tibble::add_column(dropout=as.numeric(str_replace(string = x ,pattern = ".*-dropout%5C=([0-9]+.[0-9])-metrics-\\d+.csv","\\1") ))
+               %>% tibble::add_column(sample=as.factor(str_replace(string = x ,pattern = ".*metrics-(\\d+).csv","\\1") ))
+          
+                )
+
+results_att_256tune <-do.call(rbind,results_att_256tune)
+results_att_256tune %>% group_by(sample) %>% summarise(n=n())
+```
+
+```{r fig.height=6, fig.width=10}
+
+results_att_256tune<-results_att_256tune %>% tidyr::unite("parameters",lstm_size:embedingdim:dropout) %>% filter(metric %in%  c("Balanced Accuracy","F1","Sensitivity","Specificity"))
+
+results_att_256tune %>% ggplot()+
+  geom_boxplot(aes(y=value,x=parameters,fill=parameters),color='gray')+
+  labs(title="Parameters Tuning: Attention Yang (2016)",subtitle ="Parameters: <lstm_size>_<embeding_size>_<dropout>")+
+  xlab("Parameters")+
+  ggdark::dark_theme_gray()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.position="none")+
+  facet_wrap(~metric)
+
+```
+
+```{r fig.height=6, fig.width=10}
+results_att_256tune_ordered<-results_att_256tune %>% filter(metric=="Balanced Accuracy") %>% select(value,parameters) %>% group_by(parameters) %>%  summarise(mean=mean(value),sd=sd(value))  %>% arrange(desc(mean))
+
+results_att_256tune_ordered$parameters<-factor(results_att_256tune_ordered$parameters,levels=unique(results_att_256tune_ordered$parameters))
+
+
+att_256_sd_plot<-  ggplot(aes(x=parameters,y=mean),data=results_att_256tune_ordered)+
+   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,color='yellow')+
+   geom_point(color='red')+
+  ylab("Mean Balanced Accuracy")+
+    ggdark::dark_theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+   theme(legend.position="none")+
+   ylim(0.80,0.95)+
+   labs(title="Parameters Tuning: Attention Yang (2016) ",subtitle ="Balanced Accuracy: Mean and Standard Deviation\nParameteres: <lstm_size>_<embeding_size>_<dropout>",caption="batch_size=256")
+  
+att_256_sd_plot
+```
+
+
+## Comparison
+```{r fig.height=5, fig.width=18}
+gridplot<-gridExtra::grid.arrange(lstm_sd_plot+ theme(plot.title = element_text(size=8))
+                                    + theme(plot.subtitle = element_text(size=6))
+                                            
+                        
+                        ,lstm_256_sd_plot + theme(plot.title = element_text(size=8))
+                                    + theme(plot.subtitle = element_text(size=6))
+                        
+                        ,att_sd_plot+ theme(plot.title = element_text(size=8))
+                                    + theme(plot.subtitle = element_text(size=6))
+                        
+                        ,att_256_sd_plot+ theme(plot.title = element_text(size=8))
+                                    + theme(plot.subtitle = element_text(size=6))
+                        
+                      
+                        
+                        ,cnn1d_sd_plot + theme(plot.title = element_text(size=8))
+                                    + theme(plot.subtitle = element_text(size=6))
+                        
+                        ,cnn1d_256_sd_plot + theme(plot.title = element_text(size=8))
+                                     + theme(plot.subtitle = element_text(size=6))
+                        
+                        ,ncol=6)
+gridplot %>% plot()
+```
+
+```{r}
+results_att_256tune$model<-"att_256"
+results_att_tune$model<-"att_1024"
+results_cnn1d_256_tune$model<-"cnn1d_256"
+results_cnn1d_tune$model<-"cnn1d_1024"  
+results_lstm_256_tune$model<-"lstm_256"
+results_lstm_tune$model<-"lstm"
+
+rbind( results_att_256tune,
+results_att_tune,
+results_cnn1d_256_tune,
+results_cnn1d_tune,
+results_lstm_256_tune,
+results_lstm_tune) %>% readr::write_csv("~/sequence_classification_metrics.csv")
+
+  
+
 ```
 
 ```{r}

@@ -1,7 +1,7 @@
 # Script for analizing different stratagies for dealing with imbalaced data
 # 05/12/2021
 
-
+setwd("/home/gab/deepseq/")
 source("create_csv.R")
 source("preprocess.R")
 source("build_model.R")
