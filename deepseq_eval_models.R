@@ -1,7 +1,7 @@
 #
 #
 #
-setwd("/home/gab/deepseq/")
+setwd("/home/harpo/hostdir/deepseq")
 source("create_csv.R")
 source("preprocess.R")
 source("build_model.R")
@@ -18,7 +18,8 @@ option_list <- list(
   make_option("--list-available-models", action="store_true", help = "List different models", dest="list_models",default=FALSE),
   make_option("--maxlen", action="store", type="numeric", default=45, help = "Set the maximun length of the domain name considered"),
   make_option("--testfile", action="store", type="character", help = "A file to load test data from"),
-  make_option("--trainfile", action="store", type="character", help = "A file to load train data from")
+  make_option("--trainfile", action="store", type="character", help = "A file to load train data from"),
+  make_option("--tune", action="store_true", help = "hyperparameter tuning",default=FALSE)
   
 )
 opt <- parse_args(OptionParser(option_list=option_list))
@@ -54,26 +55,86 @@ if(!is.null(testset) & !is.null(trainset) ){
   #print(train_dataset_keras$label %>% table())
   #print(train_dataset_keras$class %>% table())
   
-  ### Train and test a model ####
-  message("[] Creating model and evaluating model on test.")
   
-  models_results<-c()
-  parameters_combinations <- expand.grid(eval(parse(
-    text = paste(
-      "default_keras_model_",
-      names(funcs)[opt$modelid],
-      "_parameters_tune",
-      sep = ""
-    ) # TODO: verify existence
-  )))
-  #print(parameters_combinations)
   
-   for (i in 1:nrow(parameters_combinations)) {
-   #for (i in c(4,1)) {
-      
-    selected_parameters <- parameters_combinations[i, ]
-    print(selected_parameters)
-    
+  if (opt$tune == TRUE)
+  {
+    message("[] Tunning model and evaluating model on test.")
+    models_results<-c()
+    parameters_combinations <- expand.grid(eval(parse(
+      text = paste(
+        "default_keras_model_",
+        names(funcs)[opt$modelid],
+        "_parameters_tune",
+        sep = ""
+      ) # TODO: verify existence
+    )))
+    for (i in 1:nrow(parameters_combinations)) {
+      selected_parameters <- parameters_combinations[i, ]
+      #print(selected_parameters)
+      results <-
+        evaluate_model_train_test(
+          train_dataset_keras,
+          test_dataset_keras,
+          modelfun = funcs[[opt$modelid]],
+          selected_parameters,
+          opt$experimentname
+        )
+      message("[] Saving results ")
+      selected_parameters_collapsed <-
+        purrr::map2(selected_parameters, names(selected_parameters), function(x, y)
+          paste0(y, "=", x)) %>% unlist() %>% paste(collapse = "-")
+      write_csv(
+        results$result,
+        col_names = T,
+        path = paste(
+          results_dir,
+          "results_test_",
+          opt$experimenttag,
+          "-",
+          selected_parameters_collapsed,
+          ".csv",
+          sep = ""
+        )
+      )
+      write_csv(
+        results$resultperclass,
+        col_names = T,
+        path = paste(
+          results_dir,
+          "results_per_subclass_test_",
+          opt$experimenttag,
+          "-",
+          selected_parameters_collapsed,
+          ".csv",
+          sep = ""
+        )
+      )
+      write_csv(
+        results$history %>% as.data.frame(),
+        col_names = T,
+        path = paste(
+          results_dir,
+          "results_history_test_",
+          opt$experimenttag,
+          "-",
+          selected_parameters_collapsed,
+          ".csv",
+          sep = ""
+        )
+      )
+      gc()
+    }
+  } 
+  else #No tuning parameters
+  {
+    ### Train and test a model ####
+    message("[] Creating model and evaluating model on test.")
+    selected_parameters <-
+      eval(parse(text = paste(
+        "default_keras_model_", names(funcs)[opt$modelid], "_parameters", sep =""
+      ) # TODO: verify existence
+      ))
     results <-
       evaluate_model_train_test(
         train_dataset_keras,
@@ -82,7 +143,6 @@ if(!is.null(testset) & !is.null(trainset) ){
         selected_parameters,
         opt$experimentname
       )
-    
     message("[] Saving results ")
     selected_parameters_collapsed <-
       purrr::map2(selected_parameters, names(selected_parameters), function(x, y)
@@ -93,9 +153,10 @@ if(!is.null(testset) & !is.null(trainset) ){
       path = paste(
         results_dir,
         "results_test_",
-        opt$experimenttag,"-",
+        opt$experimenttag,
+        "-",
         selected_parameters_collapsed,
-        ".csv",
+        "-test-only.csv",
         sep = ""
       )
     )
@@ -105,9 +166,10 @@ if(!is.null(testset) & !is.null(trainset) ){
       path = paste(
         results_dir,
         "results_per_subclass_test_",
-        opt$experimenttag,"-",
+        opt$experimenttag,
+        "-",
         selected_parameters_collapsed,
-        ".csv",
+        "-test-only.csv",
         sep = ""
       )
     )
@@ -117,12 +179,12 @@ if(!is.null(testset) & !is.null(trainset) ){
       path = paste(
         results_dir,
         "results_history_test_",
-        opt$experimenttag,"-",
+        opt$experimenttag,
+        "-",
         selected_parameters_collapsed,
-        ".csv",
+        "-test-only.csv",
         sep = ""
       )
     )
-  gc()
   }
 }
