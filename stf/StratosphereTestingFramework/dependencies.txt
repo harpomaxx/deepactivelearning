@@ -1,0 +1,6 @@
+python-prettytable
+python-transaction
+python-persistent
+python-zodb
+python-sparse
+
